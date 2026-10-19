@@ -15,6 +15,11 @@
 - [設計筆記與決策紀錄](docs/DESIGN.md)：概念、評估、研究、已做的決定、路線圖
 - [研究資料](docs/RESEARCH.md)：《Dressmaker》流程拆解、手作娃娃市場調查
 - [v1.0 上架計畫](docs/RELEASE_PLAN.md)：上架 itch.io 前還缺什麼、步驟與時程
+- [Unity 移植](docs/UNITY_PORT.md)：正式版本的 Unity 專案（`unity/`）結構、進度與里程碑
+
+## Unity 正式版本（開發中）
+
+用 Unity 6000.3 開啟 `unity/` 資料夾，打開場景 `Assets/_Doll/Scenes/Design.unity` 按 Play。目前移植到設計畫面，詳見 [docs/UNITY_PORT.md](docs/UNITY_PORT.md)。
 
 ## 開發方式
 
