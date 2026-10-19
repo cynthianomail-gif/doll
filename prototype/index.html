@@ -61,6 +61,10 @@ body.stream #streamBar{display:flex}
 .modal .mbox{background:var(--panel);border-radius:16px;padding:16px 18px;max-width:600px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)}
 .modal h3{margin:0 0 6px;font-size:17px}
 .modal textarea{width:100%;box-sizing:border-box;font-family:Consolas,monospace;font-size:12px;line-height:1.4;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);resize:vertical}
+.hbtns{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.tipcard{background:#fff6dc;border:1px solid #f0d9a0;border-radius:12px;padding:10px 12px;margin:0 0 10px;font-size:14px;line-height:1.7;display:flex;gap:10px;align-items:flex-start}
+.tipcard .t{flex:1}
+.keys{list-style:none;padding:0;margin:8px 0 0;font-size:13.5px;line-height:1.9}
 .adj{background:#fbf3e9;border:1px dashed #e2cdb6;border-radius:10px;padding:6px 10px;margin:6px 0 10px;font-size:13px;color:var(--muted)}
 .adj .row{margin-top:4px}
 kbd{background:#fff;border:1px solid #d9c8b4;border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:12px;font-family:inherit}
@@ -87,8 +91,9 @@ aside{display:flex;flex-direction:column;gap:12px;min-width:0}
 </head>
 <body>
 <header>
-  <h1>🧸 娃娃工坊 <small style="font-size:12px;color:var(--muted);font-weight:normal">原型 v0.9</small></h1>
+  <h1>🧸 娃娃工坊 <small style="font-size:12px;color:var(--muted);font-weight:normal">原型 v1.0-dev</small></h1>
   <div class="steps" id="steps"></div>
+  <div class="hbtns"><button class="btn small" id="hHome">🏠 首頁</button><button class="btn small" id="hHelp">？ 操作說明</button><button class="btn small" id="hSet">⚙ 設定</button></div>
 </header>
 <main>
   <section class="stage">
@@ -389,15 +394,18 @@ function drawItem(it,g=ctx){g.save();g.translate(it.x,it.y);g.rotate(it.rot);g.s
 
 // ===================== 音效 =====================
 let AC=null;
+function master(){if(!AC._m){AC._m=AC.createGain();AC._m.connect(AC.destination)}AC._m.gain.value=meta.settings.sound?1:0;return AC._m}
 function ensureAudio(){if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume()}
-function tone(f,dur,type='sine',vol=.15,slide=0,delay=0){if(!AC)return;const t=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(f*slide,t+dur);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+dur+.02)}
-function noise(dur,vol,freq){if(!AC)return;const b=AC.createBuffer(1,Math.floor(AC.sampleRate*dur),AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(1-i/d.length);const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=b;f.type='bandpass';f.frequency.value=freq;g.gain.value=vol;s.connect(f).connect(g).connect(AC.destination);s.start()}
+function tone(f,dur,type='sine',vol=.15,slide=0,delay=0){if(!AC)return;const t=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(f*slide,t+dur);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(master());o.start(t);o.stop(t+dur+.02)}
+function noise(dur,vol,freq){if(!AC)return;const b=AC.createBuffer(1,Math.floor(AC.sampleRate*dur),AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(1-i/d.length);const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=b;f.type='bandpass';f.frequency.value=freq;g.gain.value=vol;s.connect(f).connect(g).connect(master());s.start()}
 const SFX={snip:()=>noise(.05,.35,4200),thunk:()=>tone(150,.06,'triangle',.22,.5),jam:()=>tone(70,.25,'square',.07),puff:()=>noise(.14,.12,700),squish:()=>noise(.09,.08,350),
  ding:()=>{tone(660,.18,'sine',.15);tone(880,.22,'sine',.15,0,.12);tone(1320,.3,'sine',.12,0,.24)},pop:()=>tone(520,.08,'sine',.12,1.6),no:()=>tone(220,.12,'triangle',.12,.7),sad:()=>{tone(330,.25,'triangle',.12,.8);tone(247,.35,'triangle',.12,.8,.2)}};
 
 // ===================== 狀態 =====================
 let S=null;
-const meta={coins:100,rep:0,done:0,queue:[],dolls:[],clothes:[],mannequins:{},closet:{model:null,flash:'',flashT:0},series:[],seriesSel:0,chroma:false};
+const meta={coins:100,rep:0,done:0,queue:[],dolls:[],clothes:[],mannequins:{},closet:{model:null,flash:'',flashT:0},series:[],seriesSel:0,chroma:false,
+ settings:{reduceMotion:!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches),sound:true,tips:true},tipsSeen:{},tutDone:false};
+const RM=()=>meta.settings.reduceMotion;
 const ptr={x:-99,y:-99,down:false,inside:false,speed:0,lastT:0,lastMove:0};
 let lastSfx=0;
 const flash=(o,msg)=>{o.flash=msg;o.flashT=performance.now()};
@@ -407,7 +415,7 @@ const NONE=k=>PARTS[k].opts[0];
 const ALL_ORDERS=ORDERS.concat(CLOTH_ORDERS);
 function startOrder(){
  if(!meta.queue.length)meta.queue=shuffle(ALL_ORDERS.map((_,i)=>i));
- S=blankState(ALL_ORDERS[meta.queue.shift()]);
+ S=blankState(!meta.tutDone?ORDERS[0]:ALL_ORDERS[meta.queue.shift()]);if(!meta.tutDone)S.tutorial=true;
  if(S.mode==='garment')S.model=buildDoll(S.order.doll);
  setStep('order');
 }
@@ -704,7 +712,7 @@ function enterDeliver(){
   return;
  }
  S.result=S.mode==='garment'?evaluateGarment():evaluate();const r=S.result;
- meta.coins+=r.profit;meta.rep+=r.stars-3;meta.done++;saveGame();
+ meta.coins+=r.profit;meta.rep+=r.stars-3;meta.done++;if(S.tutorial)meta.tutDone=true;saveGame();
  if(r.stars>=4){SFX.ding();for(let i=0;i<90;i++)S.confetti.push({x:CX-90+(Math.random()-.5)*80,y:CY-40,vx:(Math.random()-.5)*9,vy:-Math.random()*9-3,c:['#f4b6c6','#f6d96b','#a9d3ee','#a6dcc0','#e07a5f'][i%5],r:Math.random()*Math.PI,l:1})}
  else if(r.stars<=2)SFX.sad();else SFX.pop();
 }
@@ -996,9 +1004,12 @@ function deDoll(o,byId){
  }finally{S=keep}
  return d;
 }
-function saveGame(){try{localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,series:meta.series,chroma:meta.chroma,coins:meta.coins,rep:meta.rep,done:meta.done,clothes:meta.clothes.map(serGarment),dolls:meta.dolls.map(serDoll)}))}catch(e){console.warn('存檔失敗',e)}}
+function saveGame(){try{const prev=localStorage.getItem(SAVE_KEY);if(prev)localStorage.setItem(SAVE_KEY+'-bak',prev);localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,settings:meta.settings,tipsSeen:meta.tipsSeen,tutDone:meta.tutDone,series:meta.series,chroma:meta.chroma,coins:meta.coins,rep:meta.rep,done:meta.done,clothes:meta.clothes.map(serGarment),dolls:meta.dolls.map(serDoll)}))}catch(e){console.warn('存檔失敗',e)}}
 function loadGame(){
- try{const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;const o=JSON.parse(raw);
+ let o=null;
+ try{const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;o=JSON.parse(raw)}catch(e){console.warn('主要存檔壞掉，改讀備份',e);try{o=JSON.parse(localStorage.getItem(SAVE_KEY+'-bak'))}catch(e2){o=null}}
+ if(!o)return;
+ try{if(o.settings)Object.assign(meta.settings,o.settings);meta.tipsSeen=o.tipsSeen||{};meta.tutDone=!!o.tutDone;
   meta.coins=o.coins;meta.rep=o.rep;meta.done=o.done;meta.clothes=(o.clothes||[]).map(deGarment);
   const byId=Object.fromEntries(meta.clothes.map(g=>[g.id,g]));meta.dolls=(o.dolls||[]).map(x=>deDoll(x,byId));meta.series=o.series||[];meta.chroma=!!o.chroma;
  }catch(e){console.warn('讀取存檔失敗',e)}
@@ -1199,7 +1210,7 @@ function unboxUpdate(dt,now){
   if(u.t>(u.rar==='secret'?1.8:u.rar==='rare'?1.1:.7)){u.phase='reveal';u.t=0;
    if(u.rar==='secret'){[523,659,784,1047,1319].forEach((f,i)=>tone(f,.3,'sine',.14,0,i*.09))}else SFX.ding();
    const cols=u.rar==='secret'?['#ff7b9c','#ffd54a','#7ed6a0','#7fb6ff','#c59bff']:u.rar==='rare'?['#ffd54a','#ffe9a8','#f6b84a']:['#f4b6c6','#f6d96b','#a9d3ee','#a6dcc0'];
-   for(let i=0;i<(u.rar==='secret'?160:90);i++)u.confetti.push({x:CX+(Math.random()-.5)*60,y:200,vx:(Math.random()-.5)*12,vy:-Math.random()*10-3,c:cols[i%cols.length],r:Math.random()*Math.PI,l:1})}}
+   for(let i=0;i<(u.rar==='secret'?160:90)*(RM()?.35:1);i++)u.confetti.push({x:CX+(Math.random()-.5)*60,y:200,vx:(Math.random()-.5)*12,vy:-Math.random()*10-3,c:cols[i%cols.length],r:Math.random()*Math.PI,l:1})}}
  if(u.phase==='reveal'&&u.t>1.8){u.phase='card';u.t=0;u.series.owned[u.doll.id]=(u.series.owned[u.doll.id]||0)+1;saveGame();renderControls()}
  u.confetti.forEach(p=>{p.vy+=.22;p.x+=p.vx;p.y+=p.vy;p.r+=.12;if(p.y>H-30)p.l-=dt*2});u.confetti=u.confetti.filter(p=>p.l>0);
 }
@@ -1212,14 +1223,14 @@ function unboxMove(p,prev){
 }
 function renderUnbox(now){
  const u=S.unbox,se=u.series,bx=CX-110,by=280,bw=220,bh=200,bd=70;
- if(meta.chroma){ctx.fillStyle='#00b140';ctx.fillRect(0,0,W,H)}else{const g=ctx.createRadialGradient(CX,220,30,CX,260,560);g.addColorStop(0,u.phase==='suspense'&&u.rar==='secret'&&Math.floor(now/90)%2?'#4a3a58':'#3a2f40');g.addColorStop(1,'#141017');ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
+ if(meta.chroma){ctx.fillStyle='#00b140';ctx.fillRect(0,0,W,H)}else{const g=ctx.createRadialGradient(CX,220,30,CX,260,560);g.addColorStop(0,u.phase==='suspense'&&u.rar==='secret'&&!RM()&&Math.floor(now/90)%2?'#4a3a58':'#3a2f40');g.addColorStop(1,'#141017');ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
  const rc=RAR[u.rar].color,reveal=u.phase==='reveal'||u.phase==='card';
- if(reveal)drawRays(CX,190,rc,now/1000,Math.min(1,u.t*2+(u.phase==='card'?1:0)));
- const shake=u.phase==='shake'?Math.sin(u.t*50)*7*(1-u.t):u.phase==='lid'?Math.sin(now/30)*u.tear*3:0;
+ if(reveal)drawRays(CX,190,rc,RM()?0:now/1000,Math.min(1,u.t*2+(u.phase==='card'?1:0)));
+ const shake=RM()?0:u.phase==='shake'?Math.sin(u.t*50)*7*(1-u.t):u.phase==='lid'?Math.sin(now/30)*u.tear*3:0;
  const lid=u.phase==='lid'?u.tear*.25:u.phase==='lidfly'?.25+u.t*3:2;
  drawBox(bx,by,bw,bh,bd,se.box,se.name,{lid,open:u.phase!=='shake'&&u.phase!=='lid',shake});
  if(['bagrise','bag','suspense'].includes(u.phase)){const k=u.phase==='bagrise'?Math.min(1,u.t/.6):1,ease=1-(1-k)**3,bh2=190,y=by+30-ease*200;
-  ctx.save();ctx.beginPath();ctx.rect(0,0,W,by+4);ctx.clip();drawBag(CX-75,y,150,bh2,u.bagTear,now,u.phase==='suspense'?Math.sin(now/25)*4:0);ctx.restore()}
+  ctx.save();ctx.beginPath();ctx.rect(0,0,W,by+4);ctx.clip();drawBag(CX-75,y,150,bh2,u.bagTear,now,u.phase==='suspense'&&!RM()?Math.sin(now/25)*4:0);ctx.restore()}
  if(reveal){const k=u.phase==='card'?1:Math.min(1,u.t/.8),e=1-(1-k)**3,bounce=k<1?0:Math.sin(Math.min(1,u.t)*Math.PI)*0;
   drawDollAt(u.doll,CX,190+(1-e)*120,.62*(.4+.6*e)+bounce,now);
   const r=RAR[u.rar];ctx.font=`bold ${u.rar==='secret'?30:24}px ${UI_FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=u.rar==='secret'?`hsl(${(now/6)%360},90%,70%)`:u.rar==='rare'?'#ffd54a':'#fff';
@@ -1322,9 +1333,9 @@ async function importCode(code){
 // ----- 對話框 -----
 function modal(title,text,code,btns,readOnly){
  const M=document.getElementById('modal');document.getElementById('mTitle').textContent=title;document.getElementById('mText').innerHTML=text;
- const ta=document.getElementById('mCode');ta.value=code||'';ta.readOnly=!!readOnly;document.getElementById('mMsg').textContent='';
+ const ta=document.getElementById('mCode');ta.style.display=code===null?'none':'';ta.value=code||'';ta.readOnly=!!readOnly;document.getElementById('mMsg').textContent='';
  const B=document.getElementById('mBtns');B.innerHTML='';btns.forEach(([label,fn,main])=>{const b=document.createElement('button');b.className='btn'+(main?' main':'');b.textContent=label;b.onclick=fn;B.appendChild(b)});
- M.classList.add('on');setTimeout(()=>{readOnly?ta.select():ta.focus()},30);
+ M.classList.add('on');if(code!==null)setTimeout(()=>{readOnly?ta.select():ta.focus()},30);
 }
 const closeModal=()=>document.getElementById('modal').classList.remove('on');
 const mMsg=t=>document.getElementById('mMsg').textContent=t;
@@ -1341,6 +1352,76 @@ function showImport(pre=''){
    flash(meta.closet,r.se?`匯入了系列「${r.se.name}」（${r.dolls.length} 款）`:`匯入了「${r.dolls[0].name}」`);renderSteps();renderControls();renderSide(true)}
    catch(e){mMsg('匯入失敗：'+e.message);SFX.no()}},true],
   ['取消',closeModal]],false);
+}
+
+
+// ===================== 教學提示、操作說明、設定 =====================
+const TIPS={
+ order:'客人會用自己的話說需求。仔細讀，自己判斷對方想要什麼樣的娃娃——交件後才會知道客人真正在意的是什麼。右邊的帳本會記錄花費。',
+ material:'先選材質和娃娃類型，再點下面的分頁（身體、耳朵……）選造型和布料。畫面上的耳朵、手、腳可以直接拖曳移動；身體比例用滑桿調。',
+ layout:'把布片拖到布上排好，越省布越便宜。布片上的箭頭要和布上的箭頭同方向，也要避開污漬。選取布片後按 R 或右鍵可以旋轉。',
+ cut:'按住滑鼠，沿著虛線剪。剪歪的地方會留下紅線，影響手工分數。',
+ sew:'先在虛線上點幾下放珠針（橘色段落代表還沒固定）。開始車縫後：按住滑鼠沿虛線走，車速不要超過右邊的紅線；珠針靠近時按空白鍵拔掉；開頭和結尾按住 B 回針。覺得太難可以打開「車縫輔助」。',
+ stuff:'在棉花袋上按住，拉出棉花（按越久越大團），拖到要塞的部位放開。耳朵、手腳只能塞小團，而且要在身體塞滿之前先塞。在娃娃上來回揉，可以把凹凸揉平。',
+ decor:'點下面的配件加到娃娃上，拖曳移動、滾輪縮放。眼睛、嘴巴都是刺繡的五官。',
+ deliver:'交件了！看看客人在意的是什麼，下一位客人的話可以讀得更仔細。',
+ gdesign:'做衣服：選種類和尺寸。衣服要跟娃娃的身形一樣才穿得下（帽子看頭圍）——看清楚客人說的娃娃身形。',
+ gdecor:'在衣服上加蕾絲、鈕扣、口袋等裝飾。',
+ cast:'搪膠灌模：按住倒膠到虛線；烤的時候指針走到綠色區間就出爐；倒膠時按住越久，外殼越薄越軟。',
+ trim:'沿著邊緣削掉凸出來的毛邊，刀子不要切進娃娃。',
+ saw:'沿著鉛筆線慢慢鋸，太快鋸子會卡住。',
+ carve:'刮掉外圍多餘的木頭，不要鑿進娃娃本體。',
+ sand:'按住來回磨：先用粗砂紙磨平，再換細砂紙磨光。',
+ paint:'自由上色：選顏料和筆刷大小，按住拖曳就能畫。噴漆適合畫腮紅這類漸層。',
+ closet:'衣櫃：選娃娃或人台，點衣服穿上或脫下。同身形的衣服才穿得下。',
+ series:'盲盒系列：放進 2–7 隻自己做的娃娃，設定稀有度和盒子，就能開盒、存海報或分享代碼。',
+ unbox:'開箱：往上拖撕開盒蓋，再左右拖撕開鋁箔袋。⚠ 抽到隱藏款時畫面會閃爍——如果對閃光敏感，請先到「⚙ 設定」打開「減少閃爍與晃動」。',
+};
+function tipCard(){
+ const t=TIPS[S.step];if(!t||!meta.settings.tips||meta.tipsSeen[S.step])return'';
+ return`<div class="tipcard"><span>💡</span><div class="t"><b>${S.tutorial?'新手教學':'小提示'}</b>　${t}</div><button class="btn small" data-act="tipOk">知道了</button></div>`;
+}
+const KEYS=[['滑鼠拖曳','剪布、車縫、塞棉花、移動配件和部件'],['滾輪','縮放選取的配件或部件'],['R／右鍵','排版時旋轉布片'],['空白鍵','車縫時拔掉前面的珠針'],['按住 B','車縫開頭和結尾回針'],['Delete','刪除選取的配件'],['Esc','離開直播模式']];
+function showHelp(){
+ const t=TIPS[S.step];
+ modal('？ 操作說明',`${t?`<div style="font-size:14px;line-height:1.8;color:var(--ink)"><b>這一步：</b>${t}</div>`:''}<ul class="keys">${KEYS.map(([k,v])=>`<li><kbd>${k}</kbd>　${v}</li>`).join('')}</ul>`,null,[['關閉',closeModal,true]]);
+}
+function showSettings(){
+ const st=meta.settings,on=b=>b?'開':'關';
+ modal('⚙ 設定','<div style="font-size:14px;line-height:1.8;color:var(--ink)">「減少閃爍與晃動」會關掉開箱時的閃爍、晃動和旋轉光芒，並減少彩帶。對閃光敏感的玩家請打開。<br>收藏只存在這個瀏覽器裡；換電腦或清除瀏覽器資料就會消失，重要的娃娃和系列可以用分享代碼備份。</div>',null,[
+  [`減少閃爍與晃動：${on(st.reduceMotion)}`,()=>{st.reduceMotion=!st.reduceMotion;saveGame();showSettings()},true],
+  [`音效：${on(st.sound)}`,()=>{st.sound=!st.sound;if(AC)master();saveGame();showSettings()}],
+  [`教學提示：${on(st.tips)}`,()=>{st.tips=!st.tips;saveGame();renderControls();showSettings()}],
+  ['重新顯示所有提示',()=>{meta.tipsSeen={};st.tips=true;saveGame();renderControls();mMsg('提示會在每一步重新出現。')}],
+  ['清除存檔',()=>{ACT.resetSave()}],
+  ['關閉',closeModal]]);
+}
+// ===================== 錯誤防護 =====================
+let crashed=false;
+function showCrash(err){
+ if(crashed)return;crashed=true;console.error(err);
+ try{modal('😵 出了點問題',`遊戲遇到錯誤，已經先停下來，避免弄壞存檔。你的收藏在出錯前已經存好了。<br><small style="color:#b0907a">${esc(String((err&&err.message)||err||'')).slice(0,200)}</small>`,null,[
+  ['回到首頁',()=>{closeModal();crashed=false;try{showTitle()}catch(e){location.reload();return}requestAnimationFrame(loop)},true],['重新整理',()=>location.reload()]])}
+ catch(e){alert('遊戲出錯了，請重新整理頁面。')}
+}
+window.addEventListener('error',e=>showCrash(e.error||e.message));
+window.addEventListener('unhandledrejection',e=>showCrash(e.reason));
+// ===================== 標題畫面 =====================
+function showTitle(){S=blankState(FREE_ORDER('doll'));S.step='title';cv.style.cursor='default';if(document.activeElement)document.activeElement.blur();renderSteps();renderControls();renderSide(true)}
+let titleDolls=null;
+function titleSamples(){
+ if(meta.dolls.length)return meta.dolls.slice(-3);
+ return titleDolls||(titleDolls=[buildDoll({hair:'twin',hairColor:'milktea',skin:'skin',decor:['eyes_sparkle','mouth_w','blush'],name:'a'}),buildDoll({head:{size:1.12},hair:'fluffy',hairColor:'cocoa',skin:'tan',decor:['eyes_stitch','mouth_smile'],name:'b'}),buildDoll({torso:{w:1.4},hair:'bob',hairColor:'brick',skin:'skin',decor:['eyes_dot','mouth_w','blush'],name:'c'})]);
+}
+function renderTitle(now){
+ const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#fde9dc');g.addColorStop(1,'#f3d6bd');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ ctx.fillStyle='rgba(255,255,255,.35)';for(let i=0;i<26;i++){const x=(i*137)%W,y=(i*89+now/(RM()?400:60))%H;circle(ctx,x,y,2+(i%3));ctx.fill()}
+ ctx.fillStyle='#c98b5e';ctx.fillRect(0,470,W,90);ctx.fillStyle='#b0764c';ctx.fillRect(0,470,W,8);
+ const ds=titleSamples();ds.forEach((d,i)=>{const n=ds.length,x=W/2+(i-(n-1)/2)*190,bob=RM()?0:Math.sin(now/600+i*1.7)*5;drawDollAt(d,x,350+bob,.42,now)});
+ ctx.textAlign='center';ctx.textBaseline='middle';
+ ctx.font=`bold 64px ${UI_FONT}`;ctx.lineWidth=10;ctx.strokeStyle='#fffaf3';ctx.strokeText('娃娃工坊',W/2,96);ctx.fillStyle='#c9603f';ctx.fillText('娃娃工坊',W/2,96);
+ ctx.font=`18px ${UI_FONT}`;ctx.fillStyle='#8a5a3a';ctx.fillText('從一塊布開始，親手做出世界上獨一無二的娃娃',W/2,150);
+ ctx.font=`12px ${UI_FONT}`;ctx.fillStyle='#b0907a';ctx.fillText('原型 v1.0-dev・暫名',W/2,528);
 }
 
 // ===================== 輸入 =====================
@@ -1416,6 +1497,8 @@ window.addEventListener('pointerup',()=>{if(S&&S.step==='sew')S.sew.backHold=fal
 // ===================== 動作 =====================
 const ACT={
  accept(){setStep(S.mode==='garment'?'gdesign':'material')},
+ startShop(){startOrder()},
+ tipOk(){meta.tipsSeen[S.step]=true;saveGame();renderControls()},
  skip(){startOrder()},
  free(mode){startFree(mode)},
  gtype(id){const was=GT_BY[S.g.type].sizeBy;S.g.type=id;if(GT_BY[id].sizeBy!==was)S.g.cls=defaultCls(id,S.order.free);S.g.p=Object.fromEntries(GT_BY[id].params.map(x=>[x[0],x[4]]));SFX.pop();renderControls()},
@@ -1424,7 +1507,7 @@ const ACT={
  gcolor(id){S.g.fab.color=COLOR_BY[id];SFX.pop();renderControls()},
  toGdecor(){setStep('gdecor')},
  series(){if(!['series','unbox'].includes(S.step))S._prevS=S.step;S.step='series';cv.style.cursor='default';renderSteps();renderControls()},
- leaveSeries(){if(S._prevS==='deliver')startOrder();else setStep('order')},
+ leaveSeries(){if(S._prevS==='title')showTitle();else if(S._prevS==='deliver')startOrder();else setStep('order')},
  backSeries(){S.step='series';cv.style.cursor='default';renderSteps();renderControls()},
  snew(){meta.series.push({id:newId(),name:`我的系列 ${meta.series.length+1}`,dolls:[],box:{color:'pink',pattern:'dots',pcolor:'#ffffff'},owned:{},opened:0});meta.seriesSel=meta.series.length-1;saveGame();SFX.pop();renderControls()},
  ssel(i){meta.seriesSel=+i;renderControls()},
@@ -1438,7 +1521,7 @@ const ACT={
  poster(){render(performance.now());const a=document.createElement('a');a.download=`盲盒系列_${curSeries().name}.png`;a.href=cv.toDataURL('image/png');a.click()},
  stream(){document.body.classList.toggle('stream');setTimeout(()=>window.scrollTo(0,0),0)},
  closet(){const C=meta.closet;if(!C.model)C.model=meta.dolls.find(d=>d.kind==='human')||mannequin('20cm 正常體');S._prev=S.step;S.step='closet';cv.style.cursor='default';renderSteps();renderControls()},
- leaveCloset(){if(S._prev==='deliver')startOrder();else setStep('order')},
+ leaveCloset(){if(S._prev==='title')showTitle();else if(S._prev==='deliver')startOrder();else setStep('order')},
  model(i){const list=closetModels();meta.closet.model=list[+i];SFX.pop();renderControls()},
  wear(i){const C=meta.closet,g=meta.clothes[+i],m=C.model,slot=GT_BY[g.type].slot;
   if(m.kind!=='human'){flash(C,'布偶不能穿衣服（之後的版本再加）');SFX.no();return}
@@ -1512,7 +1595,7 @@ function slotOfTab(){return S.tab==='head'?'body':S.tab}
 
 // ===================== 介面 =====================
 function renderSteps(){
- const el=document.getElementById('steps');if(['closet','series','unbox'].includes(S.step)){el.innerHTML=`<span class="step on">${{closet:'🧺 衣櫃',series:'🎁 盲盒系列',unbox:'🎁 開箱'}[S.step]}</span>`;return}
+ const el=document.getElementById('steps');if(['closet','series','unbox','title'].includes(S.step)){el.innerHTML=`<span class="step on">${{closet:'🧺 衣櫃',series:'🎁 盲盒系列',unbox:'🎁 開箱',title:'🏠 首頁'}[S.step]}</span>`;return}
  const ST=S.mode==='garment'?STEPS_G:S.material==='vinyl'?STEPS_V:S.material==='wood'?STEPS_W:STEPS_D,i=ST.findIndex(s=>s[0]===S.step);
  el.innerHTML=ST.map(([id,n],j)=>[id,S.order.free&&id==='deliver'?'完成':S.order.free&&id==='order'?'自由創作':n]).map(([id,n],j)=>`<span class="step ${j===i?'on':j<i?'done':''}">${j<i?'✓ ':''}${n}</span>`).join('');
 }
@@ -1571,10 +1654,12 @@ function closetPanel(){
  return h;
 }
 function renderControls(){
- let h='<div id="status"></div>';
+ let h=tipCard()+'<div id="status"></div>';
  switch(S.step){
   case'order':h+=`<div class="row"><button class="btn main" data-act="accept">接下委託 →</button><button class="btn" data-act="skip">換一位客人</button></div>
    <div class="row"><button class="btn" data-act="free" data-arg="doll">🧸 自由創作：做娃娃</button><button class="btn" data-act="free" data-arg="garment">👗 自由創作：做衣服</button><button class="btn" data-act="closet">🧺 衣櫃（娃娃 ${meta.dolls.length}・衣服 ${meta.clothes.length}）</button><button class="btn" data-act="series">🎁 盲盒系列（${meta.series.length}）</button><button class="btn" data-act="importCode">📥 匯入代碼</button></div>`;break;
+  case'title':h+=`<div class="row"><button class="btn main" data-act="startShop">🧵 開店接單</button><button class="btn" data-act="free" data-arg="doll">🧸 自由創作：做娃娃</button><button class="btn" data-act="free" data-arg="garment">👗 自由創作：做衣服</button></div>
+   <div class="row"><button class="btn" data-act="closet">🧺 衣櫃（娃娃 ${meta.dolls.length}・衣服 ${meta.clothes.length}）</button><button class="btn" data-act="series">🎁 盲盒系列（${meta.series.length}）</button><button class="btn" data-act="importCode">📥 匯入代碼</button></div>`;break;
   case'material':h+=materialPanel();break;
   case'cast':{const c=S.cast;h+=c.phase==='pour'?`<div class="row"><button class="btn main" data-act="castNext" ${c.amount<.2?'disabled':''}>灌好了，送進烤箱 →</button></div>`
    :c.phase==='bake'?`<div class="row"><button class="btn main" data-act="bakeStop">出爐！</button></div>`
@@ -1636,6 +1721,7 @@ function renderControls(){
 function updateStatus(){
  const el=document.getElementById('status');if(!el)return;let t='';
  switch(S.step){
+  case'title':t=meta.tutDone?'歡迎回來！要接單、自由創作，還是去開盲盒？':'第一次來嗎？按「開店接單」，第一位客人會帶你一步一步做出第一隻娃娃。';break;
   case'order':t=S.mode==='garment'?'有客人帶著自己的娃娃來訂做衣服。仔細讀客人說的話，也要看清楚娃娃的身形。':'有客人上門了。仔細讀客人說的話——你要自己判斷對方想要什麼樣的娃娃。';break;
   case'gdesign':t=S.g.cls?`選種類、尺寸、布料，用滑桿調整樣式。${GT_BY[S.g.type].cat==='acc'?'帽子看頭圍，其他配件是通用尺寸。':''}${S.order.free?'':'畫面上是客人的娃娃，尺寸不對的話，衣服會看起來太小或太大。'}`:'先選尺寸（身形）。';break;
   case'gdecor':t=`在衣服上加蕾絲、鈕扣、口袋等裝飾。拖曳移動、滾輪縮放。目前花費 $${cost()}${S.order.free?'':` ／ 預算 $${S.order.budget}`}`;break;
@@ -1672,6 +1758,9 @@ function updateStatus(){
 }
 let sideCache='';
 function renderSide(force){
+ if(S.step==='title'){const h=`<div class="card"><h3>🧸 歡迎來到娃娃工坊</h3><div class="tips" style="font-size:13.5px">接客人的訂單，從排版、裁布、車縫到塞棉花，親手做出娃娃。也可以做衣服、做搪膠和木頭公仔，組成盲盒系列和朋友交換。</div></div>
+  <div class="card wallet"><span>💰 $${meta.coins}</span><span>⭐ 聲望 ${meta.rep}</span><span>🧸 ${meta.done} 件</span></div>
+  <div class="card tips">需要滑鼠和鍵盤。收藏會自動存在這個瀏覽器裡。<br>右上角有「？ 操作說明」和「⚙ 設定」（含減少閃爍）。</div>`;if(force||h!==sideCache){document.getElementById('side').innerHTML=h;sideCache=h}return}
  const o=S.order,dc=decorCost(),fc=S.fabricCost,c=fc+dc;
  const h=`<div class="card"><div class="who"><span class="em">${o.emoji}</span>${o.who}</div><p class="quote">「${o.text}」</p><div style="font-size:14px">${o.free?'材料費從你的錢扣':`預算 <b>$${o.budget}</b>`}</div></div>
  <div class="card"><h3>🧾 帳本</h3><ul class="check">
@@ -1835,6 +1924,7 @@ function render(now){
  case'gdecor':{bgPlain();drawModelWithGarment(now);
   S.decor.forEach((it,i)=>{drawItem(it);if(i===S.sel){ctx.setLineDash([5,4]);ctx.strokeStyle='#e07a5f';ctx.lineWidth=2;circle(ctx,it.x,it.y,DECOR_BY[it.type].hit*it.s+4);ctx.stroke();ctx.setLineDash([])}});
   hint('點下方的裝飾加到衣服上；拖曳移動、滾輪縮放');break}
+ case'title':renderTitle(now);break;
  case'series':renderSeries(now);break;
  case'unbox':renderUnbox(now);break;
  case'closet':{bgPlain();const m=meta.closet.model;withDoll(m,()=>drawDoll(now,{sel:false}));
@@ -1884,12 +1974,16 @@ function update(dt,now){
  updateStatus();
 }
 let lastT=performance.now(),sideT=0;
-function loop(now){const dt=Math.min(.05,(now-lastT)/1000);lastT=now;update(dt,now);render(now);if(now-sideT>250){renderSide();sideT=now}requestAnimationFrame(loop)}
+function loop(now){if(crashed)return;const dt=Math.min(.05,(now-lastT)/1000);lastT=now;try{update(dt,now);render(now);if(now-sideT>250){renderSide();sideT=now}}catch(e){showCrash(e);return}requestAnimationFrame(loop)}
 document.getElementById('exitStream').onclick=()=>document.body.classList.remove('stream');
 document.getElementById('chromaBtn').onclick=e=>{meta.chroma=!meta.chroma;e.target.textContent=`綠幕：${meta.chroma?'開':'關'}`;saveGame()};
 window.addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('stream')});
 document.getElementById('modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
-loadGame();if(location.hash.startsWith('#share='))setTimeout(()=>showImport(decodeURIComponent(location.hash.slice(7))),300);document.getElementById('chromaBtn').textContent=`綠幕：${meta.chroma?'開':'關'}`;startOrder();requestAnimationFrame(loop);
+loadGame();if(location.hash.startsWith('#share='))setTimeout(()=>showImport(decodeURIComponent(location.hash.slice(7))),300);document.getElementById('chromaBtn').textContent=`綠幕：${meta.chroma?'開':'關'}`;
+document.getElementById('hHelp').onclick=()=>showHelp();
+document.getElementById('hSet').onclick=()=>showSettings();
+document.getElementById('hHome').onclick=()=>{const busy=!['title','order','deliver','closet','series','unbox'].includes(S.step);if(busy&&!confirm('現在離開，這件作品就不做了（已經花掉的材料費不會退）。確定回到首頁嗎？'))return;showTitle()};
+showTitle();requestAnimationFrame(loop);
 </script>
 </body>
 </html>
