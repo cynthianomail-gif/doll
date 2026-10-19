@@ -61,6 +61,9 @@ body.stream #streamBar{display:flex}
 .modal .mbox{background:var(--panel);border-radius:16px;padding:16px 18px;max-width:600px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)}
 .modal h3{margin:0 0 6px;font-size:17px}
 .modal textarea{width:100%;box-sizing:border-box;font-family:Consolas,monospace;font-size:12px;line-height:1.4;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);resize:vertical}
+.touchpad{display:none;position:fixed;right:14px;bottom:14px;z-index:8;gap:10px}
+body.touch .touchpad.on{display:flex}
+.touchpad .btn{padding:16px 20px;font-size:17px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
 .hbtns{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
 .tipcard{background:#fff6dc;border:1px solid #f0d9a0;border-radius:12px;padding:10px 12px;margin:0 0 10px;font-size:14px;line-height:1.7;display:flex;gap:10px;align-items:flex-start}
 .tipcard .t{flex:1}
@@ -93,7 +96,7 @@ aside{display:flex;flex-direction:column;gap:12px;min-width:0}
 <header>
   <h1>🧸 娃娃工坊 <small style="font-size:12px;color:var(--muted);font-weight:normal">原型 v1.0-dev</small></h1>
   <div class="steps" id="steps"></div>
-  <div class="hbtns"><button class="btn small" id="hHome">🏠 首頁</button><button class="btn small" id="hHelp">？ 操作說明</button><button class="btn small" id="hSet">⚙ 設定</button></div>
+  <div class="hbtns"><button class="btn small" id="hHome">🏠 首頁</button><button class="btn small" id="hHelp">？ 操作說明</button><button class="btn small" id="hSet">⚙ 設定</button><button class="btn small" id="hFb">💬 意見回饋</button></div>
 </header>
 <main>
   <section class="stage">
@@ -102,6 +105,7 @@ aside{display:flex;flex-direction:column;gap:12px;min-width:0}
   </section>
   <aside id="side"></aside>
   <div id="modal" class="modal"><div class="mbox"><h3 id="mTitle"></h3><div id="mText" class="tips"></div><textarea id="mCode" rows="7" spellcheck="false"></textarea><div id="mMsg" class="tips" style="min-height:20px;margin-top:4px"></div><div class="row" id="mBtns"></div></div></div>
+  <div class="touchpad" id="touchPad"><button class="btn" id="tpPin">📍 拔珠針</button><button class="btn main" id="tpBack">↩ 回針（按住）</button></div>
   <div id="streamBar"><button class="btn small" id="chromaBtn">綠幕：關</button><button class="btn small" id="exitStream">離開直播模式（Esc）</button></div>
 </main>
 <script>
@@ -253,6 +257,23 @@ const CLOTH_ORDERS=[
   need:[{tag:'活潑',min:2},{notType:'skirt'}],budget:100,
   lines:{good:'她一定會拿第一名！',mid:'嗯……應該跑得動。',bad:'這樣怎麼跑步啦！'}},
 ];
+CLOTH_ORDERS.push(
+ {type:'cloth',who:'雅婷',emoji:'🎤',text:'我家娃娃「阿喵」是 25cm 正常體，週末要跟我去看搖滾演唱會！幫她做一件酷一點、又有活力的衣服。',
+  doll:{torso:{h:1.27},hair:'part',hairColor:'coal',skin:'skin',decor:['eyes_dot','mouth_fang']},
+  need:[{tag:'酷',min:1},{tag:'活潑',min:1}],budget:110,
+  lines:{good:'阿喵穿這樣一定是全場最酷的！',mid:'嗯，可以去演唱會了。',bad:'這穿去演唱會會被笑啦。'}},
+ {type:'cloth',who:'Ann',emoji:'👩‍🔬',text:'我的娃娃「糖糖」是 15cm 胖胖體，很怕冷。想幫她做一件可以披著的「斗篷」，摸起來溫暖一點。',
+  doll:{torso:{h:.82,w:1.4},hair:'bob',hairColor:'milktea',skin:'skin',decor:['eyes_stitch','blush']},
+  need:[{needSlot:'outer',label:'要斗篷'},{tag:'溫柔',min:1}],budget:100,
+  lines:{good:'糖糖披著好像一顆暖暖的湯圓！',mid:'這樣應該不會冷了。',bad:'她還是在發抖……'}},
+ {type:'cloth',who:'小P',emoji:'📷',text:'我要幫娃娃拍一組文青照片，想要一頂有質感的「帽子」。她的頭比較小，是頭圍 S。',
+  doll:{head:{size:.84},hair:'hime',hairColor:'cocoa',skin:'skin',decor:['eyes_sparkle','mouth_smile']},
+  need:[{needSlot:'hat',label:'要帽子'},{tag:'高級',min:1}],budget:80,
+  lines:{good:'這頂帽子一戴，整組照片都有氣質了。',mid:'可以拍，效果還行。',bad:'這頂帽子跟照片風格不太搭。'}},
+ {type:'cloth',who:'Grace',emoji:'👰',text:'我開婚紗店，櫥窗娃娃是 20cm 正常體，要當花童。幫她做一件「裙子」，長長的、看起來很高級。',
+  doll:{hair:'twin',hairColor:'milktea',skin:'skin',decor:['eyes_sparkle','mouth_smile','blush']},
+  need:[{isType:'skirt',label:'要裙子'},{tag:'高級',min:2}],budget:130,
+  lines:{good:'櫥窗一下子變得好夢幻！',mid:'嗯，放櫥窗應該可以。',bad:'這不太像婚禮上的花童……'}});
 CLOTH_ORDERS.push({type:'cloth',who:'小雨',emoji:'🧑‍🦱',text:'我的娃娃「大福」頭比較大，是頭圍 L。冬天到了，想幫她做一頂暖暖的帽子，戴起來軟軟的那種。',
   doll:{head:{size:1.22},hair:'bob',hairColor:'cocoa',skin:'skin',decor:['eyes_stitch','mouth_smile','blush']},
   need:[{needSlot:'hat',label:'要帽子'},{tag:'溫柔',min:2}],budget:70,
@@ -284,6 +305,30 @@ const ORDERS=[
  {who:'Leo',emoji:'🕶️',text:'我在收藏設計師玩具。想要一隻硬挺、有質感、放在展示櫃裡會很酷的公仔。',
   need:[{tag:'酷',min:2},{tag:'高級',min:2}],soft:'firm',budget:240,
   lines:{good:'這質感可以進我的展示櫃最上層。',mid:'嗯，還算有收藏價值。',bad:'這……比較像小孩的玩具。'}},
+ {who:'王老師',emoji:'🧑‍🏫',text:'我在教木工課，想要一隻「木頭做的」娃娃擺在教室，讓學生看看木頭也可以很溫柔。',
+  need:[{needMat:'wood',label:'木頭做的'},{tag:'溫柔',min:2}],soft:'any',budget:200,
+  lines:{good:'學生一定會搶著摸它。',mid:'嗯，木紋還不錯。',bad:'這……不太像木頭的作品耶。'}},
+ {who:'阿傑',emoji:'👨‍🍼',text:'這是寶寶的第一隻娃娃。要軟軟的、抱起來安心，看起來可愛一點。',
+  need:[{tag:'療癒',min:2},{tag:'可愛',min:1}],soft:'soft',budget:180,
+  lines:{good:'寶寶一抓到就不放手了！',mid:'應該可以陪寶寶睡覺。',bad:'這個寶寶可能會怕……'}},
+ {who:'小晴',emoji:'🙋‍♀️',text:'我要做應援娃娃！要「人形」的，最好閃閃亮亮、很可愛，演唱會舉起來大家都看得到。',
+  need:[{needKind:'human',label:'人形娃娃'},{tag:'可愛',min:2},{tag:'高級',min:1}],soft:'full',budget:230,
+  lines:{good:'這隻絕對是全場最可愛的應援娃娃！',mid:'嗯，可以帶去應援。',bad:'這樣大家認不出來是應援娃娃啦。'}},
+ {who:'老K',emoji:'🎬',text:'我在拍恐怖喜劇片，需要一隻有點詭異、但又讓人忍不住笑出來的娃娃當道具。',
+  need:[{tag:'酷',min:2},{tag:'好笑',min:2}],soft:'any',budget:210,
+  lines:{good:'完美！這隻一出場觀眾就會又叫又笑。',mid:'可以用，再靠燈光補一下。',bad:'太正常了，嚇不到人。'}},
+ {who:'林伯伯',emoji:'👴',text:'孫子下個月生日，想送他一隻像我小時候那種復古的熊娃娃，飽飽的那種。',
+  need:[{tag:'復古',min:2},{tag:'溫柔',min:1}],soft:'full',budget:160,
+  lines:{good:'就是這個樣子！孫子一定會喜歡。',mid:'跟我記憶中的有點像。',bad:'現在的熊都長這樣喔？'}},
+ {who:'Ivy',emoji:'👩‍🎓',text:'我是設計系學生，要拍作品集。想要一隻「搪膠」做的公仔，顏色和質感都要很高級。',
+  need:[{needMat:'vinyl',label:'搪膠做的'},{tag:'高級',min:2}],soft:'firm',budget:260,
+  lines:{good:'這張照片可以當作品集封面了！',mid:'質感還可以，拍起來應該不錯。',bad:'這樣放進作品集會被教授念……'}},
+ {who:'美雲',emoji:'👩‍🦳',text:'我開寵物店，想要一隻放在店門口的吉祥物，要活潑、讓人經過就想笑。',
+  need:[{tag:'活潑',min:2},{tag:'好笑',min:1}],soft:'full',budget:220,
+  lines:{good:'客人一定會停下來跟它拍照！',mid:'放門口應該還行。',bad:'好像有點嚇到路過的狗了……'}},
+ {who:'阿明',emoji:'🥱',text:'我最近一直失眠。想要一隻超級軟、抱著就能睡著的娃娃，越療癒越好。',
+  need:[{tag:'療癒',min:3}],soft:'soft',budget:240,
+  lines:{good:'抱著它……我已經想睡了……',mid:'嗯，抱起來還算舒服。',bad:'抱著它反而更清醒了。'}},
  {who:'小安',emoji:'🧒',text:'我想要一隻跟我一樣綁雙馬尾的娃娃！要可以帶去學校、塞在書包裡也不會壞掉。',
   need:[{tag:'活潑',min:2},{tag:'可愛',min:2}],soft:'full',budget:200,
   lines:{good:'哇！她跟我一模一樣！我要叫她小小安！',mid:'嗯……還可以啦。',bad:'這不像我啦……'}},
@@ -639,7 +684,10 @@ const sewAcc=()=>avg(sewList().map(s=>s.acc));
 const backOk=()=>sewList().every(s=>s.backStart&&s.backEnd);
 function evaluate(){
  const t=tally(),o=S.order,comments=[],regs=S.stuff.regs,review=[];
- const reqS=o.need.map(n=>{const v=t[n.tag];let s=1;
+ const reqS=o.need.map(n=>{
+  if(n.needMat){const ok=S.material===n.needMat;review.push({text:n.label,ok});if(!ok)comments.push(`我想要的是${n.label}的耶……`);return ok?1:0}
+  if(n.needKind){const ok=S.kind===n.needKind;review.push({text:n.label,ok});if(!ok)comments.push(`我想要的是${n.label}……`);return ok?1:0}
+  const v=t[n.tag];let s=1;
   if(n.min!=null&&v<n.min){s=Math.min(s,v/n.min);comments.push(`感覺不夠「${n.tag}」……`)}
   if(n.max!=null&&v>n.max){s=Math.min(s,Math.max(0,1-(v-n.max)*.4));comments.push(`太「${n.tag}」了啦。`)}
   review.push({text:n.max!=null&&n.min==null?`不要太「${n.tag}」`:n.max!=null?`「${n.tag}」但不要太過`:`「${n.tag}」`,ok:needOk(n,v)});
@@ -687,7 +735,9 @@ function evaluateGarment(){
  const o=S.order,g=S.g,t=gTally(g),comments=[],review=[];
  const reqS=o.need.map(n=>{
   if(n.notType){const ok=g.type!==n.notType;review.push({text:`不要${GT_BY[n.notType].name}`,ok});if(!ok)comments.push(`我說過不要${GT_BY[n.notType].name}的……`);return ok?1:0}
+  if(n.isType){const ok=g.type===n.isType;review.push({text:n.label,ok});if(!ok)comments.push(`我想要的是${GT_BY[n.isType].name}耶……`);return ok?1:0}
   if(n.needSlot){const ok=GT_BY[g.type].slot===n.needSlot;review.push({text:n.label,ok});if(!ok)comments.push(`我想要的是${n.label.replace('要','')}耶……`);return ok?1:0}
+  if(!n.tag)return 1;
   const v=t[n.tag];let s=1;
   if(n.min!=null&&v<n.min){s=Math.min(s,v/n.min);comments.push(`感覺不夠「${n.tag}」……`)}
   if(n.max!=null&&v>n.max){s=Math.min(s,Math.max(0,1-(v-n.max)*.4));comments.push(`太「${n.tag}」了啦。`)}
@@ -1381,7 +1431,7 @@ function tipCard(){
  const t=TIPS[S.step];if(!t||!meta.settings.tips||meta.tipsSeen[S.step])return'';
  return`<div class="tipcard"><span>💡</span><div class="t"><b>${S.tutorial?'新手教學':'小提示'}</b>　${t}</div><button class="btn small" data-act="tipOk">知道了</button></div>`;
 }
-const KEYS=[['滑鼠拖曳','剪布、車縫、塞棉花、移動配件和部件'],['滾輪','縮放選取的配件或部件'],['R／右鍵','排版時旋轉布片'],['空白鍵','車縫時拔掉前面的珠針'],['按住 B','車縫開頭和結尾回針'],['Delete','刪除選取的配件'],['Esc','離開直播模式']];
+const KEYS=[['觸控','用手指操作時，車縫畫面右下角會出現「拔珠針」和「回針」大按鈕；滾輪縮放可以改用畫面下方的放大、縮小按鈕'],['滑鼠拖曳','剪布、車縫、塞棉花、移動配件和部件'],['滾輪','縮放選取的配件或部件'],['R／右鍵','排版時旋轉布片'],['空白鍵','車縫時拔掉前面的珠針'],['按住 B','車縫開頭和結尾回針'],['Delete','刪除選取的配件'],['Esc','離開直播模式']];
 function showHelp(){
  const t=TIPS[S.step];
  modal('？ 操作說明',`${t?`<div style="font-size:14px;line-height:1.8;color:var(--ink)"><b>這一步：</b>${t}</div>`:''}<ul class="keys">${KEYS.map(([k,v])=>`<li><kbd>${k}</kbd>　${v}</li>`).join('')}</ul>`,null,[['關閉',closeModal,true]]);
@@ -1395,6 +1445,16 @@ function showSettings(){
   ['重新顯示所有提示',()=>{meta.tipsSeen={};st.tips=true;saveGame();renderControls();mMsg('提示會在每一步重新出現。')}],
   ['清除存檔',()=>{ACT.resetSave()}],
   ['關閉',closeModal]]);
+}
+// ===================== 意見回饋 =====================
+// 填上 Google 表單（或其他問卷）的網址後，回饋視窗會多一個「前往表單」按鈕。留空時，玩家可以複製內容貼到 itch.io 留言。
+const FEEDBACK_URL='';
+function feedbackInfo(){return`【版本】v1.0-dev\n【目前畫面】${S.step}\n【已完成作品】${meta.done} 件・收藏 ${meta.dolls.length} 隻・衣服 ${meta.clothes.length} 件・系列 ${meta.series.length} 個\n【瀏覽器】${navigator.userAgent.slice(0,120)}`}
+function showFeedback(){
+ const tpl=`哪一步最好玩？\n\n哪一步卡住、看不懂或覺得無聊？\n\n有沒有遇到錯誤？\n\n其他想說的：\n\n----\n${feedbackInfo()}`;
+ modal('💬 意見回饋',`謝謝你試玩！在下面寫下感想${FEEDBACK_URL?'，按「複製並前往表單」後貼到表單裡':'，按「複製」後貼到遊戲頁面的留言區'}。最下面會附上版本和目前畫面，方便我們找問題（不包含任何個人資料）。`,tpl,[
+  [FEEDBACK_URL?'複製並前往表單':'複製',async()=>{const v=document.getElementById('mCode').value;try{await navigator.clipboard.writeText(v);mMsg('已複製！')}catch(e){const ta=document.getElementById('mCode');ta.select();try{document.execCommand('copy');mMsg('已複製！')}catch(e2){mMsg('請手動選取複製（Ctrl+C）')}}if(FEEDBACK_URL)window.open(FEEDBACK_URL,'_blank','noopener')},true],
+  ['關閉',closeModal]],false);
 }
 // ===================== 錯誤防護 =====================
 let crashed=false;
@@ -1427,6 +1487,7 @@ function renderTitle(now){
 // ===================== 輸入 =====================
 function toLocal(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
 cv.addEventListener('pointerdown',e=>{
+ if(e.pointerType==='touch'&&!document.body.classList.contains('touch'))document.body.classList.add('touch');
  ensureAudio();cv.setPointerCapture(e.pointerId);const p=toLocal(e),right=e.button===2;
  Object.assign(ptr,{down:true,x:p.x,y:p.y,lastT:performance.now(),speed:0,inside:true});
  switch(S.step){
@@ -1498,6 +1559,8 @@ window.addEventListener('pointerup',()=>{if(S&&S.step==='sew')S.sew.backHold=fal
 const ACT={
  accept(){setStep(S.mode==='garment'?'gdesign':'material')},
  startShop(){startOrder()},
+ feedback(){showFeedback()},
+ pullpin(){pullPin()},
  tipOk(){meta.tipsSeen[S.step]=true;saveGame();renderControls()},
  skip(){startOrder()},
  free(mode){startFree(mode)},
@@ -1659,7 +1722,7 @@ function renderControls(){
   case'order':h+=`<div class="row"><button class="btn main" data-act="accept">接下委託 →</button><button class="btn" data-act="skip">換一位客人</button></div>
    <div class="row"><button class="btn" data-act="free" data-arg="doll">🧸 自由創作：做娃娃</button><button class="btn" data-act="free" data-arg="garment">👗 自由創作：做衣服</button><button class="btn" data-act="closet">🧺 衣櫃（娃娃 ${meta.dolls.length}・衣服 ${meta.clothes.length}）</button><button class="btn" data-act="series">🎁 盲盒系列（${meta.series.length}）</button><button class="btn" data-act="importCode">📥 匯入代碼</button></div>`;break;
   case'title':h+=`<div class="row"><button class="btn main" data-act="startShop">🧵 開店接單</button><button class="btn" data-act="free" data-arg="doll">🧸 自由創作：做娃娃</button><button class="btn" data-act="free" data-arg="garment">👗 自由創作：做衣服</button></div>
-   <div class="row"><button class="btn" data-act="closet">🧺 衣櫃（娃娃 ${meta.dolls.length}・衣服 ${meta.clothes.length}）</button><button class="btn" data-act="series">🎁 盲盒系列（${meta.series.length}）</button><button class="btn" data-act="importCode">📥 匯入代碼</button></div>`;break;
+   <div class="row"><button class="btn" data-act="closet">🧺 衣櫃（娃娃 ${meta.dolls.length}・衣服 ${meta.clothes.length}）</button><button class="btn" data-act="series">🎁 盲盒系列（${meta.series.length}）</button><button class="btn" data-act="importCode">📥 匯入代碼</button><button class="btn" data-act="feedback">💬 意見回饋</button></div>`;break;
   case'material':h+=materialPanel();break;
   case'cast':{const c=S.cast;h+=c.phase==='pour'?`<div class="row"><button class="btn main" data-act="castNext" ${c.amount<.2?'disabled':''}>灌好了，送進烤箱 →</button></div>`
    :c.phase==='bake'?`<div class="row"><button class="btn main" data-act="bakeStop">出爐！</button></div>`
@@ -1694,7 +1757,7 @@ function renderControls(){
   case'cut':{const c=S.cut,last=c.which>=c.order.length-1;h+=`<div class="row">${c.done?(last?'<button class="btn main" data-act="toSew">下一步：車縫 →</button>':`<button class="btn main" data-act="nextPiece">剪下一塊：${S.layout.units[c.order[c.which+1]].name} →</button>`):''}<button class="btn" data-act="recut">重剪這一塊</button></div>`;break}
   case'sew':{const sw=SW(),lastSeam=S.sew.cur>=S.sew.list.length-1;
    h+=sw.phase==='pin'?`<div class="row"><button class="btn main" data-act="startSew">珠針放好了，開始車縫 →</button></div>`
-   :`<div class="row">${sw.done?(lastSeam?(S.mode==='garment'?'<button class="btn main" data-act="toGdecor">下一步：裝飾 →</button>':'<button class="btn main" data-act="toStuff">下一步：塞棉花 →</button>'):`<button class="btn main" data-act="nextSeam">下一條：車${S.sew.list[S.sew.cur+1].name} →</button>`):''}<button class="btn" data-hold="back">回針（按住，或按住 <kbd>B</kbd>）</button><button class="btn" data-act="assist">車縫輔助：${S.sew.assist?'開':'關'}</button><button class="btn" data-act="resew">拆線重來</button></div>`;break}
+   :`<div class="row">${sw.done?(lastSeam?(S.mode==='garment'?'<button class="btn main" data-act="toGdecor">下一步：裝飾 →</button>':'<button class="btn main" data-act="toStuff">下一步：塞棉花 →</button>'):`<button class="btn main" data-act="nextSeam">下一條：車${S.sew.list[S.sew.cur+1].name} →</button>`):''}<button class="btn" data-act="pullpin">📍 拔珠針（<kbd>空白鍵</kbd>）</button><button class="btn" data-hold="back">回針（按住，或按住 <kbd>B</kbd>）</button><button class="btn" data-act="assist">車縫輔助：${S.sew.assist?'開':'關'}</button><button class="btn" data-act="resew">拆線重來</button></div>`;break}
   case'stuff':h+=S.stuff.closed?`<div class="row"><button class="btn main" data-act="toDecor">下一步：裝飾 →</button></div>`
    :S.stuff.closing?'':`<div class="row"><button class="btn" data-act="unstuff">掏出一點棉花</button><button class="btn main" id="closeBtn" data-act="close" disabled>${S.kind==='human'?'塞好了，縫合頭和身體':'塞好了，縫合開口'}</button></div>`;break;
   case'decor':{const sel=S.sel>=0;
@@ -1970,6 +2033,7 @@ function update(dt,now){
  if(S.step==='saw')S.saw.dust.forEach(d=>{d.x+=d.vx;d.y+=d.vy;d.vy+=.15;d.l-=dt*1.2});
  if(S.step==='carve')S.carve.chips.forEach(d=>{d.x+=d.vx;d.y+=d.vy;d.vy+=.3;d.r+=.2;d.l-=dt*1.5});
  if(S.step==='unbox')unboxUpdate(dt,now);
+ {const tp=document.getElementById('touchPad'),on=S.step==='sew'&&S.sew.list.length&&SW().phase==='sew'&&!SW().done;if(tp.classList.contains('on')!==!!on)tp.classList.toggle('on',!!on)}
  if(S.step==='deliver'){S.confetti.forEach(p=>{p.vy+=.25;p.x+=p.vx;p.y+=p.vy;p.r+=.1;if(p.y>H-40)p.l-=dt*2});S.confetti=S.confetti.filter(p=>p.l>0)}
  updateStatus();
 }
@@ -1982,6 +2046,9 @@ document.getElementById('modal').onclick=e=>{if(e.target.id==='modal')closeModal
 loadGame();if(location.hash.startsWith('#share='))setTimeout(()=>showImport(decodeURIComponent(location.hash.slice(7))),300);document.getElementById('chromaBtn').textContent=`綠幕：${meta.chroma?'開':'關'}`;
 document.getElementById('hHelp').onclick=()=>showHelp();
 document.getElementById('hSet').onclick=()=>showSettings();
+document.getElementById('hFb').onclick=()=>showFeedback();
+document.getElementById('tpPin').onpointerdown=e=>{e.preventDefault();ensureAudio();pullPin()};
+{const tb=document.getElementById('tpBack');tb.onpointerdown=e=>{e.preventDefault();ensureAudio();S.sew.backHold=true};tb.onpointerup=tb.onpointerleave=tb.onpointercancel=()=>{S.sew.backHold=false}}
 document.getElementById('hHome').onclick=()=>{const busy=!['title','order','deliver','closet','series','unbox'].includes(S.step);if(busy&&!confirm('現在離開，這件作品就不做了（已經花掉的材料費不會退）。確定回到首頁嗎？'))return;showTitle()};
 showTitle();requestAnimationFrame(loop);
 </script>
