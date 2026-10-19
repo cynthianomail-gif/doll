@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>娃娃工坊 原型</title>
+<style>
+:root{--bg:#f6efe6;--panel:#fffaf3;--ink:#4a3b32;--muted:#9a8778;--accent:#e07a5f;--accent2:#c9603f;--ok:#3d9a66;--bad:#d0534a;--line:#e6d8c6;--chip:#f3e8da}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif}
+header{max-width:1180px;margin:0 auto;padding:14px 16px 4px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+h1{font-size:20px;margin:0;white-space:nowrap}
+.steps{display:flex;gap:6px;flex-wrap:wrap}
+.step{padding:4px 11px;border-radius:999px;background:#ece0d0;color:var(--muted);font-size:13px}
+.step.on{background:var(--accent);color:#fff;font-weight:bold}
+.step.done{background:#d7ead9;color:#3d7a4f}
+main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;max-width:1180px;margin:0 auto;padding:10px 16px 40px}
+@media(max-width:880px){main{grid-template-columns:1fr}}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px;min-width:0}
+canvas{width:100%;height:auto;display:block;border-radius:12px;touch-action:none;user-select:none;-webkit-user-select:none}
+#controls{padding:10px 4px 2px}
+#status{font-size:15px;line-height:1.6;min-height:24px;margin-bottom:8px;color:var(--ink)}
+#status .warn{color:var(--bad);font-weight:bold}
+#status .tip{color:var(--muted);font-size:13px}
+.group{margin:6px 0 10px}
+.group h4{margin:0 0 6px;font-size:14px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:2px solid transparent;background:var(--chip);border-radius:10px;padding:6px 9px;cursor:pointer;font:inherit;font-size:14px;color:var(--ink);text-align:left;display:flex;flex-direction:column;gap:2px;min-width:70px;max-width:220px}
+.chip:hover{border-color:#e9c9a8}
+.chip.on{border-color:var(--accent);background:#fff1e8}
+.chip b{font-size:14px}
+.chip em{font-style:normal;color:var(--accent2);font-size:12px}
+.chip small{font-size:11.5px;color:#a08b79;line-height:1.4}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;border-bottom:2px solid var(--line);padding-bottom:6px}
+.tab{border:none;background:none;font:inherit;font-size:14px;padding:6px 12px;border-radius:8px;cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:6px}
+.tab.on{background:var(--accent);color:#fff;font-weight:bold}
+.tab .sw{margin:0}
+.sw{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:4px;border:1px solid rgba(0,0,0,.15)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.btn{border:none;border-radius:10px;padding:9px 16px;font:inherit;font-size:15px;cursor:pointer;background:var(--chip);color:var(--ink);user-select:none}
+.btn:hover{filter:brightness(.97)}
+.btn.main{background:var(--accent);color:#fff;font-weight:bold}
+.btn.main:hover{background:var(--accent2)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.small{padding:6px 11px;font-size:13px}
+.btn.on{outline:2px solid var(--accent)}
+kbd{background:#fff;border:1px solid #d9c8b4;border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:12px;font-family:inherit}
+aside{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.card h3{margin:0 0 8px;font-size:15px}
+.who{font-size:17px;font-weight:bold;display:flex;align-items:center;gap:8px}
+.who .em{font-size:30px}
+.quote{font-size:14.5px;line-height:1.7;margin:8px 0;color:#6a574a}
+.check{list-style:none;padding:0;margin:0;font-size:14px}
+.check li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line)}
+.check li:last-child{border-bottom:none}
+.y{color:var(--ok);font-weight:bold}.n{color:var(--bad);font-weight:bold}.q{color:var(--muted)}
+.wallet{display:flex;justify-content:space-between;font-size:14px}
+.tips{font-size:12.5px;line-height:1.7;color:var(--muted)}
+.bars{font-size:14px;margin:4px 0 8px}
+.bar{display:grid;grid-template-columns:86px 1fr 44px;gap:8px;align-items:center;margin:4px 0}
+.bar i{display:block;height:9px;border-radius:5px;background:#eadccb;overflow:hidden}
+.bar i b{display:block;height:100%;background:var(--accent)}
+.comments{font-size:14px;line-height:1.7;margin:6px 0;padding-left:18px}
+.review{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;font-size:13.5px}
+.review span{background:var(--chip);border-radius:8px;padding:3px 9px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🧸 娃娃工坊 <small style="font-size:12px;color:var(--muted);font-weight:normal">原型 v0.3</small></h1>
+  <div class="steps" id="steps"></div>
+</header>
+<main>
+  <section class="stage">
+    <canvas id="cv"></canvas>
+    <div id="controls"></div>
+  </section>
+  <aside id="side"></aside>
+</main>
+<script>
+// ===================== 幾何小工具（資料會用到） =====================
+function ellPoly(cx,cy,rx,ry,n=40){const p=[];for(let i=0;i<n;i++){const t=i/n*2*Math.PI;p.push({x:cx+Math.cos(t)*rx,y:cy+Math.sin(t)*ry})}return p}
+function qbez(a,c,b,n,out){for(let i=0;i<n;i++){const t=i/n,u=1-t;out.push({x:u*u*a.x+2*u*t*c.x+t*t*b.x,y:u*u*a.y+2*u*t*c.y+t*t*b.y})}}
+function pointyPoly(w,h){const o=[];qbez({x:-w,y:.05},{x:-w*.9,y:-h*.55},{x:0,y:-h},14,o);qbez({x:0,y:-h},{x:w*.9,y:-h*.55},{x:w,y:.05},14,o);qbez({x:w,y:.05},{x:0,y:.12},{x:-w,y:.05},8,o);return o}
+function hornPoly(w,h){const o=[];qbez({x:-w,y:.04},{x:-w*.7,y:-h*.6},{x:w*.35,y:-h},12,o);qbez({x:w*.35,y:-h},{x:w*.15,y:-h*.45},{x:w,y:.04},12,o);qbez({x:w,y:.04},{x:0,y:.1},{x:-w,y:.04},6,o);return o}
+function wingPoly(){const o=[];qbez({x:-.08,y:.02},{x:-.26,y:-.36},{x:.06,y:-.44},12,o);qbez({x:.06,y:-.44},{x:.26,y:-.32},{x:.13,y:-.2},8,o);qbez({x:.13,y:-.2},{x:.25,y:-.1},{x:.08,y:-.01},8,o);qbez({x:.08,y:-.01},{x:0,y:.07},{x:-.08,y:.02},6,o);return o}
+function heartPoly(s,dy){const o=[];for(let i=0;i<60;i++){const t=i/60*2*Math.PI,x=16*Math.sin(t)**3,y=-(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t));o.push({x:x/17*s,y:y/17*s+dy})}return o}
+
+// ===================== 資料 =====================
+// 標籤只在內部計分用，畫面上不顯示；玩家要自己解讀客人的話。
+const TAGS=['可愛','溫柔','活潑','酷','復古','療癒','高級','好笑','手作感'];
+const BODIES=[
+ {id:'round',name:'圓滾滾',tags:['溫柔'],ax:1,ay:.92,bumps:[]},
+ {id:'mochi',name:'糰子',tags:['療癒','好笑'],ax:1.22,ay:.8,bumps:[]},
+ {id:'pear',name:'西洋梨',tags:['療癒'],ax:.88,ay:.95,bumps:[[40,.15,.45],[140,.15,.45]]},
+ {id:'tall',name:'長身',tags:['高級'],ax:.78,ay:1.12,bumps:[]},
+ {id:'square',name:'方方',tags:['好笑'],ax:1,ay:.9,p:4,bumps:[]},
+ {id:'ghost',name:'幽靈',tags:['酷','好笑'],ax:.85,ay:1.02,bumps:[[52,.22,.1],[90,.24,.1],[128,.22,.1]]},
+];
+const PARTS={
+ ears:{label:'耳朵',opts:[
+  {id:'none',name:'不要'},
+  {id:'round',name:'圓耳',tags:['溫柔','復古'],a:50,inset:.14,tilt:4,layer:'back',inner:true,rname:'耳',poly:()=>ellPoly(0,-.2,.25,.24)},
+  {id:'long',name:'長耳',tags:['可愛','溫柔'],a:20,inset:.1,tilt:-6,layer:'back',inner:true,rname:'耳',poly:()=>ellPoly(0,-.5,.17,.56)},
+  {id:'pointy',name:'尖耳',tags:['活潑','可愛'],a:42,inset:.12,tilt:2,layer:'back',inner:true,rname:'耳',poly:()=>pointyPoly(.27,.52)},
+  {id:'floppy',name:'垂耳',tags:['療癒','溫柔'],a:58,inset:.06,tilt:110,layer:'front',inner:false,rname:'耳',poly:()=>ellPoly(0,-.38,.17,.44)},
+  {id:'horn',name:'小角',tags:['酷'],a:32,inset:.06,tilt:-6,layer:'back',inner:false,rname:'角',poly:()=>hornPoly(.15,.42)},
+ ]},
+ arms:{label:'手',opts:[
+  {id:'none',name:'不要'},
+  {id:'nub',name:'小圓手',tags:['可愛'],a:102,inset:.12,tilt:12,layer:'back',rname:'手',poly:()=>ellPoly(0,-.17,.15,.21)},
+  {id:'long',name:'長手',tags:['好笑'],a:100,inset:.08,tilt:28,layer:'back',rname:'手',poly:()=>ellPoly(0,-.4,.12,.44)},
+  {id:'wing',name:'小翅膀',tags:['活潑','高級'],a:58,inset:0,tilt:38,layer:'back',rname:'翅膀',nostuff:true,poly:()=>wingPoly().map(p=>({x:p.x*1.5,y:p.y*1.5}))},
+ ]},
+ feet:{label:'腳',opts:[
+  {id:'none',name:'不要'},
+  {id:'round',name:'圓腳',tags:['溫柔'],a:150,inset:.16,down:true,layer:'front',rname:'腳',poly:()=>ellPoly(0,-.13,.21,.15)},
+  {id:'long',name:'長腿',tags:['好笑'],a:156,inset:.1,down:true,layer:'front',rname:'腳',poly:()=>ellPoly(0,-.32,.11,.34)},
+ ]},
+ belly:{label:'肚子',opts:[
+  {id:'none',name:'不要'},
+  {id:'oval',name:'圓肚',tags:['療癒'],poly:()=>ellPoly(0,.3,.42,.36)},
+  {id:'heart',name:'愛心肚',tags:['可愛'],poly:()=>heartPoly(.4,.32)},
+ ]},
+};
+Object.values(PARTS).forEach(g=>g.opts.forEach(o=>{if(o.poly)o.P=o.poly()}));
+const SLOTS=[['body','身體'],['ears','耳朵'],['earInner','耳朵內側'],['arms','手'],['feet','腳'],['belly','肚子']];
+const SLOT_NAME=Object.fromEntries(SLOTS);
+const MATERIALS=[
+ {id:'felt',name:'不織布',tags:['手作感','復古'],p10:1,gloss:.25,stretch:.8,grain:'none',desc:'沒有布紋，怎麼排都行。硬挺，有一種古早的手工味。'},
+ {id:'cotton',name:'印花棉布',tags:['活潑','可愛'],p10:2,gloss:.5,stretch:1,grain:'two',desc:'有布紋（可上下顛倒）。花色明亮，看了心情好。'},
+ {id:'knit',name:'毛線針織',tags:['溫柔','復古'],p10:2,gloss:.35,stretch:1.3,grain:'two',desc:'很會延展，摸起來暖暖的。布紋排歪會塞得凹凸不平。'},
+ {id:'minky',name:'短絨毛',tags:['療癒','高級'],p10:3,gloss:.9,stretch:1.1,grain:'one',desc:'毛有順向，不能顛倒排。摸起來像雲一樣。'},
+];
+const COLORS=[
+ {id:'cream',name:'奶油白',hex:'#f3e7d3',tags:['溫柔']},
+ {id:'pink',name:'櫻花粉',hex:'#f4b6c6',tags:['可愛']},
+ {id:'sky',name:'天空藍',hex:'#a9d3ee',tags:['療癒']},
+ {id:'lemon',name:'檸檬黃',hex:'#f6d96b',tags:['活潑']},
+ {id:'mint',name:'薄荷綠',hex:'#a6dcc0',tags:['療癒']},
+ {id:'brick',name:'磚紅',hex:'#b4573f',tags:['復古']},
+ {id:'grape',name:'葡萄紫',hex:'#8e70b4',tags:['高級']},
+ {id:'coal',name:'炭黑',hex:'#3d3c43',tags:['酷']},
+];
+const MAT_BY=Object.fromEntries(MATERIALS.map(m=>[m.id,m])),COLOR_BY=Object.fromEntries(COLORS.map(c=>[c.id,c]));
+const DECOR=[
+ {id:'eyes_button',name:'鈕扣眼',tags:['復古','手作感'],cost:15,pos:'eyes',hit:40},
+ {id:'eyes_stitch',name:'刺繡瞇瞇眼',tags:['溫柔','療癒'],cost:10,pos:'eyes',hit:40},
+ {id:'eyes_dot',name:'豆豆眼',tags:['好笑','可愛'],cost:5,pos:'eyes',hit:38},
+ {id:'eyes_sparkle',name:'閃亮大眼',tags:['可愛','高級'],cost:30,pos:'eyes',hit:42},
+ {id:'eyes_x',name:'叉叉眼',tags:['酷','好笑'],cost:8,pos:'eyes',hit:40},
+ {id:'nose',name:'三角鼻',tags:['可愛'],cost:5,pos:'nose',hit:14},
+ {id:'mouth_w',name:'ω 嘴',tags:['可愛','好笑'],cost:5,pos:'mouth',hit:16},
+ {id:'mouth_smile',name:'微笑',tags:['溫柔'],cost:5,pos:'mouth',hit:16},
+ {id:'mouth_fang',name:'小尖牙',tags:['酷'],cost:8,pos:'mouth',hit:16},
+ {id:'blush',name:'腮紅',tags:['可愛','溫柔'],cost:8,pos:'cheek',hit:56},
+ {id:'bow',name:'蝴蝶結',tags:['可愛','高級'],cost:25,pos:'acc',hit:24},
+ {id:'flower',name:'小花',tags:['溫柔','活潑'],cost:15,pos:'acc',hit:18},
+ {id:'star',name:'星星補丁',tags:['活潑','手作感'],cost:15,pos:'body',hit:18},
+ {id:'heart',name:'愛心補丁',tags:['可愛'],cost:12,pos:'body',hit:16},
+ {id:'scar',name:'縫線疤痕',tags:['酷','手作感'],cost:10,pos:'body',hit:22},
+ {id:'pin',name:'安全別針',tags:['酷'],cost:10,pos:'acc',hit:20},
+ {id:'scarf',name:'格紋圍巾',tags:['復古','溫柔'],cost:30,pos:'neck',hit:50},
+];
+const DECOR_BY=Object.fromEntries(DECOR.map(d=>[d.id,d]));
+const SOFT={
+ soft:{label:'軟綿綿',range:[.35,.7]},
+ full:{label:'飽滿',range:[.7,.95]},
+ firm:{label:'硬挺',range:[.85,1.05]},
+ any:{label:'都可以',range:[.3,1.05]},
+};
+const ORDERS=[
+ {who:'林太太',emoji:'👩',text:'我女兒最近住院，晚上一個人會怕。想要一隻可以抱著睡、摸起來很安心的娃娃。',
+  need:[{tag:'療癒',min:2},{tag:'溫柔',min:2}],soft:'soft',budget:220,
+  lines:{good:'她一定會抱著它睡著的……真的謝謝你。',mid:'嗯，她應該會喜歡吧。',bad:'這個……好像不太適合放在病床上。'}},
+ {who:'阿哲',emoji:'🧑‍🎤',text:'我們樂團要一隻吊在貝斯上的吉祥物。要酷！絕對不要可愛的東西，很遜。要硬挺一點，甩起來才不會軟趴趴。',
+  need:[{tag:'酷',min:3},{tag:'可愛',max:1}],soft:'firm',budget:180,
+  lines:{good:'靠，超酷！今晚就帶上台！',mid:'還行啦，勉強可以掛。',bad:'這掛上去我會被團員笑死。'}},
+ {who:'陳奶奶',emoji:'👵',text:'我小時候有一隻手縫的娃娃，搬家時弄丟了。可以幫我做一隻有「以前那種味道」的嗎？軟硬都沒關係。',
+  need:[{tag:'復古',min:3},{tag:'手作感',min:1}],soft:'any',budget:150,
+  lines:{good:'哎呀……就是這個感覺，跟我那隻好像。',mid:'做得很用心，謝謝你啊。',bad:'現在的娃娃都長這樣啊……'}},
+ {who:'小薇',emoji:'👩‍💼',text:'工作壓力好大，想要一隻放在辦公桌上、可以一直捏的娃娃。最好看了會想笑。',
+  need:[{tag:'療癒',min:2},{tag:'好笑',min:2}],soft:'soft',budget:200,
+  lines:{good:'哈哈哈哈它的臉！我今天不會想辭職了。',mid:'還不錯，捏起來滿舒服的。',bad:'看了……更累了。'}},
+ {who:'甜點店老闆',emoji:'👨‍🍳',text:'我要一隻放在櫃檯的吉祥物，要活潑、讓客人心情好。可愛……但不要太可愛，我們不是兒童用品店。要飽滿一點，看起來才有精神。',
+  need:[{tag:'活潑',min:2},{tag:'可愛',min:1,max:3}],soft:'full',budget:260,
+  lines:{good:'完美！客人一定會跟它拍照。',mid:'嗯，放櫃檯應該可以。',bad:'這放出去，客人會以為我們走錯路線了。'}},
+];
+const STEPS=[['order','接單'],['material','設計'],['layout','排版'],['cut','裁布'],['sew','車縫'],['stuff','塞棉花'],['decor','裝飾'],['deliver','交件']];
+
+// ===================== 工具 =====================
+const D=Math.PI/180;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:0;
+function angDiff(a,b){let d=a-b;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return d}
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function hexRgb(h){const n=parseInt(h.slice(1),16);return[n>>16&255,n>>8&255,n&255]}
+function shade(h,amt){const[r,g,b]=hexRgb(h);const f=amt<0?0:255,k=Math.abs(amt);return`rgb(${Math.round(r+(f-r)*k)},${Math.round(g+(f-g)*k)},${Math.round(b+(f-b)*k)})`}
+function lum(h){const[r,g,b]=hexRgb(h);return(.299*r+.587*g+.114*b)/255}
+const pct=v=>Math.round(v*100)+'%';
+function pip(P,x,y){let c=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const a=P[i],b=P[j];if((a.y>y)!==(b.y>y)&&x<(b.x-a.x)*(y-a.y)/(b.y-a.y)+a.x)c=!c}return c}
+function bbox(P){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const p of P){x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y)}return{x0,y0,x1,y1}}
+function centroid(P){const b=bbox(P);return{x:(b.x0+b.x1)/2,y:(b.y0+b.y1)/2}}
+function overlap(P,Q){const A=bbox(P),B=bbox(Q),x0=Math.max(A.x0,B.x0),x1=Math.min(A.x1,B.x1),y0=Math.max(A.y0,B.y0),y1=Math.min(A.y1,B.y1);
+ if(x0>=x1||y0>=y1)return false;for(let y=y0;y<y1;y+=3)for(let x=x0;x<x1;x+=3)if(pip(P,x,y)&&pip(Q,x,y))return true;return false}
+function rotV(x,y,a){const c=Math.cos(a),s=Math.sin(a);return{x:x*c-y*s,y:x*s+y*c}}
+
+// ===================== 畫布 =====================
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const W=800,H=560,dpr=Math.min(2,window.devicePixelRatio||1);
+cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+const CX=400,CY=320,R=108,LS=.5,FAB={x:40,y:110,w:720,h:230},BAG={x:100,y:470};
+const EMOJI_FONT='"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+const UI_FONT='"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+
+function bumpProf(b,t){const[deg,,w,sharp]=b;const d=Math.abs(angDiff(t,deg*D));return sharp?Math.exp(-d/w):Math.exp(-((d/w)**2))}
+function shapeR(sh,t){
+ const p=sh.p||2,base=1/Math.pow(Math.abs(Math.cos(t)/sh.ax)**p+Math.abs(Math.sin(t)/sh.ay)**p,1/p);
+ let k=1;for(const b of sh.bumps)k+=b[1]*bumpProf(b,t);return base*k;
+}
+function outline(sh,scale=1,n=240,cx=CX,cy=CY){
+ const pts=[];
+ for(let i=0;i<n;i++){const t=i/n*Math.PI*2,r=R*scale*shapeR(sh,t);pts.push({x:cx+Math.cos(t)*r,y:cy+Math.sin(t)*r,t})}
+ return pts;
+}
+function pathFrom(pts,g=ctx){g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y));g.closePath()}
+function circle(g,x,y,r){g.beginPath();g.arc(x,y,r,0,Math.PI*2)}
+function ell(g,x,y,rx,ry){g.beginPath();g.ellipse(x,y,rx,ry,0,0,Math.PI*2)}
+function rrect(g,x,y,w,h,r){g.beginPath();g.roundRect?g.roundRect(x,y,w,h,r):g.rect(x,y,w,h)}
+
+const tileCache={};
+function getTile(mat,hex){
+ const key=mat.id+hex;if(tileCache[key])return tileCache[key];
+ const s=48,c=document.createElement('canvas');c.width=c.height=s;const g=c.getContext('2d');
+ g.fillStyle=hex;g.fillRect(0,0,s,s);const rnd=mulberry(7);
+ if(mat.id==='felt'){for(let i=0;i<260;i++){g.fillStyle=rnd()<.5?'rgba(255,255,255,.12)':'rgba(0,0,0,.08)';g.fillRect(rnd()*s,rnd()*s,1.6,1.6)}}
+ if(mat.id==='cotton'){g.fillStyle='rgba(255,255,255,.6)';for(const[x,y]of[[12,12],[36,36]]){circle(g,x,y,4.5);g.fill()}g.fillStyle='rgba(255,255,255,.3)';for(const[x,y]of[[36,12],[12,36]]){circle(g,x,y,2);g.fill()}}
+ if(mat.id==='knit'){g.strokeStyle='rgba(0,0,0,.13)';g.lineWidth=1.6;for(let y=0;y<s;y+=8)for(let x=0;x<s;x+=8){g.beginPath();g.moveTo(x,y);g.lineTo(x+4,y+6);g.lineTo(x+8,y);g.stroke()}}
+ if(mat.id==='minky'){for(let i=0;i<420;i++){const x=rnd()*s,y=rnd()*s;g.strokeStyle=rnd()<.5?'rgba(255,255,255,.10)':'rgba(0,0,0,.05)';g.lineWidth=1;g.beginPath();g.moveTo(x,y);g.lineTo(x+rnd()*2-1,y+2);g.stroke()}}
+ return tileCache[key]=ctx.createPattern(c,'repeat');
+}
+function drawBody(pts,mat,hex,puff,cx=CX,cy=CY,r=R,lw=3){
+ ctx.save();pathFrom(pts);ctx.fillStyle=getTile(mat,hex);ctx.fill();ctx.clip();
+ const hl=ctx.createRadialGradient(cx-r*.35,cy-r*.45,r*.05,cx-r*.35,cy-r*.45,r*1.15);
+ hl.addColorStop(0,`rgba(255,255,255,${.1+.32*puff*mat.gloss})`);hl.addColorStop(1,'rgba(255,255,255,0)');
+ ctx.fillStyle=hl;ctx.fillRect(cx-r*3,cy-r*3,r*6,r*6);
+ const sh=ctx.createRadialGradient(cx,cy-r*.1,r*.45,cx,cy,r*2);
+ sh.addColorStop(0,'rgba(70,35,20,0)');sh.addColorStop(1,`rgba(70,35,20,${.06+.34*puff})`);
+ ctx.fillStyle=sh;ctx.fillRect(cx-r*3,cy-r*3,r*6,r*6);
+ ctx.restore();
+ if(mat.id==='minky'){ctx.strokeStyle=shade(hex,.2);ctx.lineWidth=1.4;ctx.beginPath();
+  for(let i=0;i<pts.length;i+=2){const p=pts[i],dx=p.x-cx,dy=p.y-cy,l=Math.hypot(dx,dy)||1;ctx.moveTo(p.x,p.y);ctx.lineTo(p.x+dx/l*3,p.y+dy/l*3)}ctx.stroke()}
+ ctx.lineWidth=lw;ctx.lineJoin='round';ctx.strokeStyle=shade(hex,-.38);pathFrom(pts);ctx.stroke();
+}
+function drawStain(x,y,s=1){ctx.fillStyle='rgba(110,78,40,.45)';ell(ctx,x,y,7*s,5*s);ctx.fill();ctx.fillStyle='rgba(110,78,40,.3)';ell(ctx,x+4*s,y+3*s,5*s,4*s);ctx.fill()}
+
+// ===================== 配件繪製 =====================
+const ID={
+ eyes_button(g){for(const s of[-1,1]){g.save();g.translate(s*26,0);g.fillStyle='#5a3a28';circle(g,0,0,10);g.fill();g.strokeStyle='#3b2418';g.lineWidth=2;g.stroke();g.fillStyle='#2a170e';for(const[a,b]of[[-3,-3],[3,-3],[-3,3],[3,3]]){circle(g,a,b,1.6);g.fill()}g.restore()}},
+ eyes_stitch(g){g.strokeStyle='#3a2a2a';g.lineWidth=3.5;g.lineCap='round';for(const s of[-1,1]){g.beginPath();g.arc(s*26,5,9,Math.PI*1.15,Math.PI*1.85);g.stroke()}},
+ eyes_dot(g){for(const s of[-1,1]){g.fillStyle='#222';circle(g,s*24,0,6);g.fill();g.fillStyle='#fff';circle(g,s*24-2,-2,1.8);g.fill()}},
+ eyes_sparkle(g){for(const s of[-1,1]){g.save();g.translate(s*27,0);g.fillStyle='#2b2140';ell(g,0,0,11,14);g.fill();g.fillStyle='#7a63c9';ell(g,0,4,7,8);g.fill();g.fillStyle='#fff';circle(g,-3,-6,4);g.fill();circle(g,4,4,2);g.fill();g.restore()}},
+ eyes_x(g){g.strokeStyle='#222';g.lineWidth=3.5;g.lineCap='round';for(const s of[-1,1]){g.beginPath();g.moveTo(s*26-7,-7);g.lineTo(s*26+7,7);g.moveTo(s*26+7,-7);g.lineTo(s*26-7,7);g.stroke()}},
+ nose(g){g.fillStyle=g.strokeStyle='#4a2f2f';g.lineJoin='round';g.lineWidth=3;g.beginPath();g.moveTo(-7,-4);g.lineTo(7,-4);g.lineTo(0,5);g.closePath();g.stroke();g.fill()},
+ mouth_w(g){g.strokeStyle='#3a2a2a';g.lineWidth=3;g.lineCap='round';g.beginPath();g.arc(-6,0,6,0,Math.PI);g.stroke();g.beginPath();g.arc(6,0,6,0,Math.PI);g.stroke()},
+ mouth_smile(g){g.strokeStyle='#3a2a2a';g.lineWidth=3;g.lineCap='round';g.beginPath();g.arc(0,-8,13,.22*Math.PI,.78*Math.PI);g.stroke()},
+ mouth_fang(g){ID.mouth_smile(g);g.fillStyle='#fff';g.strokeStyle='#3a2a2a';g.lineWidth=1.5;for(const x of[-6,6]){g.beginPath();g.moveTo(x-3.5,3.5);g.lineTo(x+3.5,3.5);g.lineTo(x,10);g.closePath();g.fill();g.stroke()}},
+ blush(g){g.fillStyle='rgba(255,110,130,.42)';for(const s of[-1,1]){ell(g,s*46,0,12,7);g.fill()}},
+ bow(g){g.fillStyle='#e8577a';g.strokeStyle='#b23a5a';g.lineWidth=2;for(const s of[-1,1]){g.beginPath();g.moveTo(0,0);g.lineTo(s*22,-13);g.quadraticCurveTo(s*28,0,s*22,13);g.closePath();g.fill();g.stroke()}circle(g,0,0,5.5);g.fill();g.stroke()},
+ flower(g){g.fillStyle='#ffd3e0';g.strokeStyle='#e79bb0';g.lineWidth=1.5;for(let i=0;i<5;i++){const a=i/5*Math.PI*2-Math.PI/2;circle(g,Math.cos(a)*8,Math.sin(a)*8,7);g.fill();g.stroke()}g.fillStyle='#ffc94a';circle(g,0,0,5);g.fill()},
+ star(g){const sp=(ro,ri)=>{g.beginPath();for(let i=0;i<10;i++){const a=i/10*Math.PI*2-Math.PI/2,r=i%2?ri:ro;g.lineTo(Math.cos(a)*r,Math.sin(a)*r)}g.closePath()};
+  g.fillStyle='#ffd54a';g.strokeStyle='#d4a017';g.lineWidth=2;g.lineJoin='round';sp(17,8);g.fill();g.stroke();g.setLineDash([3,3]);g.strokeStyle='#a8780f';g.lineWidth=1.2;sp(12.5,5.8);g.stroke();g.setLineDash([])},
+ heart(g){const hp=k=>{g.beginPath();g.moveTo(0,12*k);g.bezierCurveTo(-18*k,0,-12*k,-14*k,0,-5*k);g.bezierCurveTo(12*k,-14*k,18*k,0,0,12*k);g.closePath()};
+  g.fillStyle='#ff7b9c';g.strokeStyle='#d5546f';g.lineWidth=2;hp(1);g.fill();g.stroke();g.setLineDash([3,3]);g.strokeStyle='#fff';g.lineWidth=1.2;hp(.7);g.stroke();g.setLineDash([])},
+ scar(g){g.strokeStyle='#3a2a2a';g.lineWidth=2.5;g.lineCap='round';g.beginPath();g.moveTo(-22,0);g.lineTo(22,0);for(const x of[-16,-8,0,8,16]){g.moveTo(x-2,-7);g.lineTo(x+2,7)}g.stroke()},
+ pin(g){g.strokeStyle='#8a8f98';g.lineWidth=2.5;g.lineCap='round';g.beginPath();g.moveTo(-14,4);g.lineTo(14,4);g.arc(14,0,4,Math.PI/2,-Math.PI/2,true);g.lineTo(-12,-4);g.stroke();g.fillStyle='#c9cdd3';g.strokeStyle='#8a8f98';g.lineWidth=1.5;rrect(g,-22,-7,9,14,3);g.fill();g.stroke()},
+ scarf(g){g.save();g.translate(24,4);g.rotate(.12);g.fillStyle='#a8302a';rrect(g,0,0,20,44,4);g.fill();g.strokeStyle='rgba(255,255,255,.35)';g.lineWidth=2;g.beginPath();g.moveTo(10,0);g.lineTo(10,44);g.moveTo(0,22);g.lineTo(20,22);g.stroke();
+  g.strokeStyle='#a8302a';g.lineWidth=2;g.beginPath();for(let x=2;x<20;x+=4){g.moveTo(x,44);g.lineTo(x,51)}g.stroke();g.restore();
+  g.fillStyle='#c0392b';rrect(g,-62,-11,124,22,10);g.fill();g.strokeStyle='rgba(255,255,255,.35)';g.lineWidth=2;g.beginPath();for(let x=-50;x<62;x+=14){g.moveTo(x,-11);g.lineTo(x,11)}g.moveTo(-62,0);g.lineTo(62,0);g.stroke();g.strokeStyle='rgba(0,0,0,.18)';g.lineWidth=1;g.beginPath();for(let x=-43;x<62;x+=14){g.moveTo(x,-11);g.lineTo(x,11)}g.stroke()},
+};
+function drawItem(it,g=ctx){g.save();g.translate(it.x,it.y);g.rotate(it.rot);g.scale(it.s,it.s);ID[it.type](g);g.restore()}
+
+// ===================== 音效 =====================
+let AC=null;
+function ensureAudio(){if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume()}
+function tone(f,dur,type='sine',vol=.15,slide=0,delay=0){if(!AC)return;const t=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(f*slide,t+dur);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+dur+.02)}
+function noise(dur,vol,freq){if(!AC)return;const b=AC.createBuffer(1,Math.floor(AC.sampleRate*dur),AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(1-i/d.length);const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=b;f.type='bandpass';f.frequency.value=freq;g.gain.value=vol;s.connect(f).connect(g).connect(AC.destination);s.start()}
+const SFX={snip:()=>noise(.05,.35,4200),thunk:()=>tone(150,.06,'triangle',.22,.5),jam:()=>tone(70,.25,'square',.07),puff:()=>noise(.14,.12,700),squish:()=>noise(.09,.08,350),
+ ding:()=>{tone(660,.18,'sine',.15);tone(880,.22,'sine',.15,0,.12);tone(1320,.3,'sine',.12,0,.24)},pop:()=>tone(520,.08,'sine',.12,1.6),no:()=>tone(220,.12,'triangle',.12,.7),sad:()=>{tone(330,.25,'triangle',.12,.8);tone(247,.35,'triangle',.12,.8,.2)}};
+
+// ===================== 狀態 =====================
+let S=null;
+const meta={coins:100,rep:0,done:0,queue:[]};
+const ptr={x:-99,y:-99,down:false,inside:false,speed:0,lastT:0,lastMove:0};
+let lastSfx=0;
+const flash=(o,msg)=>{o.flash=msg;o.flashT=performance.now()};
+const flashing=o=>performance.now()-o.flashT<1600;
+const NONE=k=>PARTS[k].opts[0];
+
+function startOrder(){
+ if(!meta.queue.length)meta.queue=shuffle(ORDERS.map((_,i)=>i));
+ S={step:'order',order:ORDERS[meta.queue.shift()],
+  body:BODIES[0],parts:{ears:NONE('ears'),arms:NONE('arms'),feet:NONE('feet'),belly:NONE('belly')},
+  fab:{body:{},ears:null,earInner:null,arms:null,feet:null,belly:null},tab:'body',
+  layout:null,fabricCost:0,stains:[],otherFlaws:0,offGrain:0,
+  cut:{order:[],which:0,pts:null,cov:null,devSum:0,devN:0,off:0,trail:[],done:false,accs:[],acc:0,doneAt:0,flaws:[],z:1},
+  sew:{phase:'pin',pins:[],path:null,idx:0,stitches:[],jams:0,pinHits:0,drift:0,jamUntil:0,done:false,acc:0,assist:false,flash:'',flashT:0,backStart:false,backEnd:false,backHold:false,backT:0},
+  stuff:{regs:null,clump:null,closing:false,closeIdx:0,closed:false,parts:[],leaked:false,flash:'',flashT:0,squish:0,kneadAt:null},
+  decor:[],sel:-1,drag:null,result:null,confetti:[]};
+ setStep('order');
+}
+function setStep(step){
+ S.step=step;
+ if(step==='layout')initLayout();
+ if(step==='cut'){S.cut.order=S.layout.units.map((_,i)=>i);S.cut.which=0;S.cut.accs=[];resetCut()}
+ if(step==='sew')resetSew(true);
+ if(step==='stuff')S.stuff.regs=regionsFor();
+ if(step==='deliver')enterDeliver();
+ cv.style.cursor=(step==='cut'||step==='sew')?'none':'default';
+ if(document.activeElement)document.activeElement.blur();
+ renderSteps();renderControls();renderSide(true);
+}
+
+// ----- 布料分配 -----
+function fab(slot){const f=S.fab[slot]||{},b=S.fab.body||{};return{mat:f.mat||b.mat,color:f.color||b.color}}
+function usedSlots(){const p=S.parts,u=['body'];if(p.ears.id!=='none'){u.push('ears');if(p.ears.inner)u.push('earInner')}
+ if(p.arms.id!=='none')u.push('arms');if(p.feet.id!=='none')u.push('feet');if(p.belly.id!=='none')u.push('belly');return u}
+const fabKey=f=>f.mat.id+'_'+f.color.id;
+const fabName=f=>`${f.mat.name}・${f.color.name}`;
+const designReady=()=>!!(S.fab.body.mat&&S.fab.body.color);
+
+// ----- 標籤與評分（內部） -----
+function tally(){
+ const t=Object.fromEntries(TAGS.map(x=>[x,0]));const add=(a,w=1)=>a.forEach(x=>t[x]+=w);
+ add(S.body.tags);Object.values(S.parts).forEach(o=>o.tags&&add(o.tags));
+ if(designReady()){const fabs=usedSlots().map(fab),bc=fab('body').color.id;
+  new Set(fabs.map(f=>f.mat.id)).forEach(id=>add(MAT_BY[id].tags));
+  add(COLOR_BY[bc].tags);const oc=new Set(fabs.map(f=>f.color.id));oc.delete(bc);oc.forEach(id=>add(COLOR_BY[id].tags,.5));
+  if(new Set(fabs.map(fabKey)).size>=3)add(['手作感','活潑'])}
+ S.decor.forEach(d=>add(DECOR_BY[d.type].tags));return t;
+}
+function decorCost(){return S.decor.reduce((s,d)=>s+DECOR_BY[d.type].cost,0)}
+function cost(){return S.fabricCost+decorCost()}
+const needOk=(n,v)=>(n.min==null||v>=n.min)&&(n.max==null||v<=n.max);
+function softLabel(p){return p<.3?'扁塌塌':p<.7?'軟綿綿':p<.95?'飽滿':p<=1.05?'硬挺':'快撐破了'}
+function overallSoft(){const r=S.stuff.regs;if(!r)return 0;const ext=r.slice(1);return ext.length?.65*r[0].fill+.35*avg(ext.map(x=>x.fill)):r[0].fill}
+function evaluate(){
+ const t=tally(),o=S.order,comments=[],regs=S.stuff.regs,review=[];
+ const reqS=o.need.map(n=>{const v=t[n.tag];let s=1;
+  if(n.min!=null&&v<n.min){s=Math.min(s,v/n.min);comments.push(`感覺不夠「${n.tag}」……`)}
+  if(n.max!=null&&v>n.max){s=Math.min(s,Math.max(0,1-(v-n.max)*.4));comments.push(`太「${n.tag}」了啦。`)}
+  review.push({text:n.max!=null&&n.min==null?`不要太「${n.tag}」`:n.max!=null?`「${n.tag}」但不要太過`:`「${n.tag}」`,ok:needOk(n,v)});
+  return s});
+ const tagS=avg(reqS);
+ const[lo,hi]=SOFT[o.soft].range,p=overallSoft();
+ let softS=p>=lo&&p<=hi?1:Math.max(0,1-Math.min(Math.abs(p-lo),Math.abs(p-hi))*3);
+ review.push({text:`柔軟度：${SOFT[o.soft].label}`,ok:p>=lo&&p<=hi});
+ if(p<lo)comments.push('有點扁，抱起來沒什麼感覺。');else if(p>hi)comments.push(p>1.05?'縫線好像快被撐開了……':'比我想的還要硬耶。');
+ regs.slice(1).forEach(r=>{if(r.fill<.3){softS=Math.max(0,softS-.12);comments.push(`${r.name}扁扁的，好像沒塞到棉花。`)}});
+ const sides={};regs.slice(1).forEach(r=>{(sides[r.part]=sides[r.part]||[]).push(r.fill)});
+ Object.entries(sides).forEach(([k,f])=>{if(f.length===2&&Math.abs(f[0]-f[1])>.35)comments.push(`兩邊的${S.parts[k].rname}一大一小耶。`)});
+ const lumpAvg=regs[0].lump;if(lumpAvg>.3)comments.push('摸起來凹凸不平的。');
+ let craft=(S.cut.acc+S.sew.acc)/2*(1-.35*lumpAvg);
+ if(S.offGrain){craft-=Math.min(.3,S.offGrain*.06);comments.push('有些布片的布紋方向不對，摸起來怪怪的。')}
+ if(S.stains.length){craft-=S.stains.length*.12;comments.push('這裡怎麼有一塊污漬？')}else if(S.otherFlaws){craft-=.05;comments.push('有個地方好像有點髒。')}
+ if(!(S.sew.backStart&&S.sew.backEnd)){craft-=.08;comments.push(S.stuff.leaked?'縫線開頭鬆了，棉花一直跑出來。':'線頭鬆鬆的，會不會散開啊？')}
+ if(regs.some(r=>r.fill>1.05))craft*=.8;
+ craft=clamp(craft,0,1);if(craft<.55)comments.push('縫得有點粗糙。');
+ const c=cost(),over=c>o.budget;review.push({text:'在預算內',ok:!over});if(over)comments.push(`超出預算了（$${c}），我只能付原本說好的錢。`);
+ let total=.5*tagS+.2*softS+.3*craft-(over?.15:0);total=clamp(total,0,1);
+ const stars=Math.max(1,Math.round(total*5));
+ const pay=Math.round(o.budget*(stars>=2?.5+.5*total:.2));
+ return{tagS,softS,craft,total,stars,pay,cost:c,profit:pay-c,comments:comments.filter(Boolean),review,line:stars>=4?o.lines.good:stars===3?o.lines.mid:o.lines.bad};
+}
+function enterDeliver(){
+ S.sel=-1;S.result=evaluate();const r=S.result;
+ meta.coins+=r.profit;meta.rep+=r.stars-3;meta.done++;
+ if(r.stars>=4){SFX.ding();for(let i=0;i<90;i++)S.confetti.push({x:CX-90+(Math.random()-.5)*80,y:CY-40,vx:(Math.random()-.5)*9,vy:-Math.random()*9-3,c:['#f4b6c6','#f6d96b','#a9d3ee','#a6dcc0','#e07a5f'][i%5],r:Math.random()*Math.PI,l:1})}
+ else if(r.stars<=2)SFX.sad();else SFX.pop();
+}
+
+// ===================== 娃娃組裝與繪製 =====================
+function bodyFill(){const r=S.stuff.regs;return r?r[0].fill:(S.step==='material'?.55:0)}
+function partFill(key,side){const o=S.parts[key];if(o.nostuff)return .5;const r=S.stuff.regs;if(r){const g=r.find(x=>x.part===key&&x.side===side);return g?g.fill:0}return S.step==='material'?.55:0}
+function radiusScale(t){const st=S.stuff,f=bodyFill(),l=st.regs?st.regs[0].lump:0;
+ const nz=Math.sin(5*t+1.3)*.6+Math.sin(9*t+2.1)*.4+Math.sin(14*t+.4)*.3;
+ return(1+.07*f)*(1+l*.045*nz)*(1+st.squish*.025*Math.sin(t*3+performance.now()/50))}
+function dollOutline(n=240){const pts=[];for(let i=0;i<n;i++){const t=i/n*Math.PI*2,r=R*shapeR(S.body,t)*radiusScale(t);pts.push({x:CX+Math.cos(t)*r,y:CY+Math.sin(t)*r,t})}return pts}
+function toDoll(dx,dy){const k=radiusScale(Math.atan2(dy,dx));return{x:CX+dx*k,y:CY+dy*k}}
+function partXform(o,side){
+ const th=(-90+side*o.a)*D,r=R*shapeR(S.body,th)*radiusScale(th)*(1-o.inset);
+ return{x:CX+Math.cos(th)*r,y:CY+Math.sin(th)*r,rot:o.down?Math.PI:th+Math.PI/2+side*(o.tilt||0)*D};
+}
+function xformPoly(P,o,side,k){const X=partXform(o,side);return P.map(p=>{const v=rotV(p.x*side*R*k,p.y*R*k,X.rot);return{x:X.x+v.x,y:X.y+v.y}})}
+function partPoly(key,side){const o=S.parts[key];return xformPoly(o.P,o,side,1+(o.nostuff?0:.12*partFill(key,side)))}
+function innerPoly(key,side){const o=S.parts[key],c=centroid(o.P);return xformPoly(o.P.map(p=>({x:c.x+(p.x-c.x)*.56,y:c.y+(p.y-c.y)*.62})),o,side,1+.12*partFill(key,side))}
+function bellyPoly(){return S.parts.belly.P.map(p=>toDoll(p.x*R,p.y*R))}
+function drawPart(key,side,showFX){
+ const o=S.parts[key],P=partPoly(key,side),f=fab(key),c=centroid(P),fill=partFill(key,side);
+ drawBody(P,f.mat,f.color.hex,Math.min(1,fill),c.x,c.y,R*.3,2.2);
+ if(o.inner){const ip=innerPoly(key,side),fi=fab('earInner');drawBody(ip,fi.mat,fi.color.hex,Math.min(1,fill),c.x,c.y,R*.2,1.6)}
+ if(showFX&&!o.nostuff){
+  const rot=partXform(o,side).rot,ax=rotV(0,-1,rot),nx={x:-ax.y,y:ax.x};
+  if(fill<.28){ctx.strokeStyle='rgba(70,40,30,.3)';ctx.lineWidth=1.5;ctx.lineCap='round';ctx.beginPath();for(const s of[-1,1]){ctx.moveTo(c.x+nx.x*s*5-ax.x*10,c.y+nx.y*s*5-ax.y*10);ctx.lineTo(c.x+nx.x*s*3+ax.x*10,c.y+nx.y*s*3+ax.y*10)}ctx.stroke()}
+  if(fill>1.05){ctx.strokeStyle='rgba(208,83,74,.7)';ctx.lineWidth=2;ctx.beginPath();for(const s of[-1,1]){ctx.moveTo(c.x+nx.x*s*14,c.y+nx.y*s*14);ctx.lineTo(c.x+nx.x*s*22,c.y+nx.y*s*22)}ctx.stroke()}
+ }
+}
+function threadColor(){return lum(fab('body').color.hex)>.55?shade(fab('body').color.hex,-.55):'#fff3e0'}
+function drawStitches(){
+ const sw=S.sew,st=sw.stitches.filter(s=>!s.bad).map(s=>toDoll(s.dx,s.dy));if(st.length<2)return;
+ ctx.lineCap='round';ctx.lineWidth=2.2;ctx.strokeStyle=threadColor();ctx.beginPath();
+ for(let i=0;i<st.length-1;i++){if(Math.floor(i/3)%2)continue;ctx.moveTo(st[i].x,st[i].y);ctx.lineTo(st[i+1].x,st[i+1].y)}ctx.stroke();
+ ctx.lineWidth=3.2;ctx.beginPath();
+ if(sw.backStart){ctx.moveTo(st[0].x,st[0].y);for(let i=1;i<Math.min(8,st.length);i++)ctx.lineTo(st[i].x,st[i].y)}
+ if(sw.backEnd){const n=st.length;ctx.moveTo(st[n-1].x,st[n-1].y);for(let i=n-2;i>=Math.max(0,n-8);i--)ctx.lineTo(st[i].x,st[i].y)}ctx.stroke();
+}
+function drawBodyFX(){
+ const regs=S.stuff.regs;if(!regs)return;const b=regs[0];
+ if(b.fill<.28){ctx.strokeStyle='rgba(70,40,30,.28)';ctx.lineWidth=1.6;ctx.lineCap='round';for(const dy of[-25,5,35]){ctx.beginPath();ctx.moveTo(CX-35,CY+dy);ctx.quadraticCurveTo(CX,CY+dy+8,CX+35,CY+dy);ctx.stroke()}}
+ if(b.lump>.12)[[.45,-.6],[.5,.9],[.35,2.2],[.5,3.6],[.4,5]].forEach(([rr,t])=>{const p=toDoll(Math.cos(t)*R*shapeR(S.body,t)*rr,Math.sin(t)*R*shapeR(S.body,t)*rr),s=10+b.lump*10;
+  const g=ctx.createRadialGradient(p.x-s*.3,p.y-s*.3,1,p.x,p.y,s);g.addColorStop(0,`rgba(255,255,255,${.25*b.lump})`);g.addColorStop(.6,'rgba(0,0,0,0)');g.addColorStop(1,`rgba(60,30,20,${.22*b.lump})`);ctx.fillStyle=g;circle(ctx,p.x,p.y,s);ctx.fill()});
+ if(b.fill>1.05){ctx.strokeStyle='rgba(208,83,74,.7)';ctx.lineWidth=2;ctx.beginPath();[0,1.2,2.4,3.6,4.8].forEach(t=>{const q=toDoll(Math.cos(t)*R*shapeR(S.body,t),Math.sin(t)*R*shapeR(S.body,t)),dx=q.x-CX,dy=q.y-CY,l=Math.hypot(dx,dy);ctx.moveTo(q.x+dx/l*4,q.y+dy/l*4);ctx.lineTo(q.x+dx/l*12,q.y+dy/l*12)});ctx.stroke()}
+}
+const PART_KEYS=['ears','arms','feet'];
+function activeParts(layer){const out=[];PART_KEYS.forEach(k=>{const o=S.parts[k];if(o.id!=='none'&&o.layer===layer)out.push(k)});return out}
+function dollAllPoints(){let pts=dollOutline(120);activeParts('front').forEach(k=>[-1,1].forEach(s=>pts=pts.concat(partPoly(k,s))));return pts}
+function groundShadow(pts){const b=bbox(pts);ctx.fillStyle='rgba(60,40,30,.16)';ell(ctx,(b.x0+b.x1)/2,b.y1+6,(b.x1-b.x0)*.42,13);ctx.fill()}
+function drawDoll(now,{decor=true,sel=true,highlight=null}={}){
+ const fx=!!S.stuff.regs,bf=fab('body');
+ groundShadow(dollAllPoints());ctx.save();
+ if(S.offGrain>=3&&bf.mat.id==='cotton'){ctx.translate(CX,CY);ctx.transform(1,0,-.06,1,0,0);ctx.translate(-CX,-CY)}
+ activeParts('back').forEach(k=>[-1,1].forEach(s=>drawPart(k,s,fx)));
+ const pts=dollOutline();drawBody(pts,bf.mat,bf.color.hex,Math.min(1,bodyFill()));
+ if(S.parts.belly.id!=='none'){const bp=bellyPoly(),f=fab('belly'),c=centroid(bp);ctx.save();pathFrom(pts);ctx.clip();drawBody(bp,f.mat,f.color.hex,.3,c.x,c.y,R*.4,1.5);
+  ctx.setLineDash([4,4]);ctx.strokeStyle=lum(f.color.hex)>.55?shade(f.color.hex,-.5):'#fff3e0';ctx.lineWidth=1.6;pathFrom(bp.map(p=>({x:c.x+(p.x-c.x)*.9,y:c.y+(p.y-c.y)*.9})));ctx.stroke();ctx.setLineDash([]);ctx.restore()}
+ S.stains.forEach(s=>{const p=toDoll(s.dx,s.dy);drawStain(p.x,p.y,1.6)});
+ drawStitches();drawBodyFX();
+ activeParts('front').forEach(k=>[-1,1].forEach(s=>drawPart(k,s,fx)));
+ if(highlight){ctx.setLineDash([6,5]);ctx.strokeStyle='#e07a5f';ctx.lineWidth=2.5;
+  if(highlight==='body')pathFrom(dollOutline(120)),ctx.stroke();
+  else if(highlight==='belly'){if(S.parts.belly.id!=='none'){pathFrom(bellyPoly());ctx.stroke()}}
+  else{const k=highlight==='earInner'?'ears':highlight;if(S.parts[k].id!=='none')[-1,1].forEach(s=>{pathFrom(highlight==='earInner'?innerPoly(k,s):partPoly(k,s));ctx.stroke()})}
+  ctx.setLineDash([])}
+ if(decor)S.decor.forEach((it,i)=>{drawItem(it);if(sel&&i===S.sel){ctx.setLineDash([5,4]);ctx.strokeStyle='#e07a5f';ctx.lineWidth=2;circle(ctx,it.x,it.y,DECOR_BY[it.type].hit*it.s+4);ctx.stroke();ctx.setLineDash([])}});
+ ctx.restore();
+}
+
+// ===================== 排版 =====================
+function grainOk(mat,r){const g=mat.grain;return g==='none'||(g==='two'&&r%2===0)||(g==='one'&&r===0)}
+function buildUnits(){
+ const U=[],sc=(P,k)=>P.map(p=>({x:p.x*R*k,y:p.y*R*k}));
+ const add=(name,slot,mult,Ppx)=>{const b=bbox(Ppx),off={x:(b.x0+b.x1)/2,y:(b.y0+b.y1)/2};U.push({name,slot,mult,P:Ppx.map(p=>({x:p.x-off.x,y:p.y-off.y})),off,size:Math.max(b.x1-b.x0,b.y1-b.y0),x:0,y:0,rot:0})};
+ add('身體','body',2,outline(S.body,1.06,120,0,0));
+ const e=S.parts.ears;if(e.id!=='none'){add(e.rname==='角'?'小角':'耳朵','ears',4,sc(e.P,1.12));if(e.inner){const c=centroid(e.P);add('耳朵內側','earInner',2,e.P.map(p=>({x:(c.x+(p.x-c.x)*.6)*R,y:(c.y+(p.y-c.y)*.66)*R})))}}
+ const a=S.parts.arms;if(a.id!=='none')add(a.rname,'arms',4,sc(a.P,1.12));
+ const f=S.parts.feet;if(f.id!=='none')add('腳','feet',4,sc(f.P,1.12));
+ const bl=S.parts.belly;if(bl.id!=='none')add('肚子','belly',1,sc(bl.P,1.06));
+ return U;
+}
+function initLayout(){
+ const units=buildUnits(),bolts=[],byKey={};
+ units.forEach((u,i)=>{const f=fab(u.slot),k=fabKey(f);if(!byKey[k]){byKey[k]={key:k,mat:f.mat,color:f.color,units:[],flaws:[]};bolts.push(byKey[k])}u.bolt=bolts.indexOf(byKey[k]);byKey[k].units.push(i)});
+ bolts.forEach(b=>{let x=50;b.units.forEach(i=>{const u=units[i],bb=bbox(u.P),w=Math.max((bb.x1-bb.x0)*LS,70);u.x=x+w/2;u.y=445;x+=w+18});
+  for(let i=0;i<2;i++)b.flaws.push({x:FAB.x+50+Math.random()*420,y:FAB.y+25+Math.random()*(FAB.h-50)})});
+ S.layout={units,bolts,cur:0,sel:-1,drag:null,check:null};layoutCheck();
+}
+function unitPoly(u){const a=u.rot*Math.PI/2;return u.P.map(p=>{const v=rotV(p.x*LS,p.y*LS,a);return{x:u.x+v.x,y:u.y+v.y}})}
+function layoutCheck(){
+ const L=S.layout,polys=L.units.map(unitPoly),uInfo=L.units.map((u,i)=>{const P=polys[i];return{inside:P.every(q=>q.x>=FAB.x&&q.x<=FAB.x+FAB.w&&q.y>=FAB.y&&q.y<=FAB.y+FAB.h),ov:false,flaws:L.bolts[u.bolt].flaws.filter(f=>pip(P,f.x,f.y)).length,grain:grainOk(L.bolts[u.bolt].mat,u.rot)}});
+ const bInfo=L.bolts.map(b=>{for(let i=0;i<b.units.length;i++)for(let j=i+1;j<b.units.length;j++){const a=b.units[i],c=b.units[j];if(overlap(polys[a],polys[c])){uInfo[a].ov=uInfo[c].ov=true}}
+  const allIn=b.units.every(i=>uInfo[i].inside),ov=b.units.some(i=>uInfo[i].ov);
+  const len=allIn?Math.ceil((Math.max(...b.units.flatMap(i=>polys[i].map(q=>q.x)))-FAB.x+4)/10)*10:0;
+  return{allIn,ov,valid:allIn&&!ov,len,cost:len/10*b.mat.p10}});
+ L.check={polys,uInfo,bInfo,valid:bInfo.every(b=>b.valid),cost:bInfo.reduce((s,b)=>s+b.cost,0)};
+}
+function unitAt(p){const L=S.layout,ids=L.bolts[L.cur].units;for(let k=ids.length-1;k>=0;k--){const i=ids[k];if(pip(L.check.polys[i],p.x,p.y))return i}return-1}
+function commitLayout(){
+ const L=S.layout,ch=L.check;S.fabricCost=ch.cost;S.offGrain=ch.uInfo.filter(x=>!x.grain).length;
+ S.stains=[];S.otherFlaws=0;
+ L.units.forEach((u,i)=>{const fl=L.bolts[u.bolt].flaws.filter(f=>pip(ch.polys[i],f.x,f.y));
+  if(u.slot==='body'){const a=-u.rot*Math.PI/2;fl.forEach(f=>{const v=rotV((f.x-u.x)/LS,(f.y-u.y)/LS,a);S.stains.push({dx:(v.x+u.off.x)/1.06,dy:(v.y+u.off.y)/1.06})})}
+  else S.otherFlaws+=fl.length});
+}
+
+// ===================== 裁布 =====================
+function curUnit(){return S.layout.units[S.cut.order[S.cut.which]]}
+function resetCut(){
+ const c=S.cut,u=curUnit(),a=u.rot*Math.PI/2;c.z=clamp(330/u.size,1,3);
+ const P=u.P.length<200?resample(u.P,240):u.P;
+ c.pts=P.map(p=>{const v=rotV(p.x*c.z,p.y*c.z,a);return{x:CX+v.x,y:CY+v.y}});c.cov=new Array(c.pts.length).fill(false);
+ c.devSum=0;c.devN=0;c.off=0;c.trail=[];c.done=false;c.doneAt=0;
+ c.flaws=S.layout.bolts[u.bolt].flaws.map(f=>({x:CX+(f.x-u.x)/LS*c.z,y:CY+(f.y-u.y)/LS*c.z})).filter(f=>f.x>130&&f.x<670&&f.y>80&&f.y<510);
+}
+function resample(P,n){const segs=[];let tot=0;for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length],l=dist(a,b);segs.push([a,b,l]);tot+=l}
+ const out=[];let si=0,acc=0;for(let k=0;k<n;k++){const d=k/n*tot;while(acc+segs[si][2]<d&&si<segs.length-1){acc+=segs[si][2];si++}const[a,b,l]=segs[si],t=l?(d-acc)/l:0;out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t})}return out}
+function cutCoverage(){return S.cut.cov.filter(Boolean).length/S.cut.cov.length}
+function processCut(q){
+ const c=S.cut;if(c.done)return;let bd=1e9;
+ for(let k=0;k<c.pts.length;k++){const d=dist(q,c.pts[k]);if(d<15)c.cov[k]=true;if(d<bd)bd=d}
+ if(bd<15){c.devSum+=bd;c.devN++}else if(bd<60)c.off++;
+ c.trail.push({x:q.x,y:q.y,ok:bd<15});
+ const now=performance.now();if(now-lastSfx>70){SFX.snip();lastSfx=now}
+ if(cutCoverage()>=.97){c.done=true;c.doneAt=now;c.accs[c.which]=clamp(1-(c.devSum/Math.max(1,c.devN))/15-Math.min(.3,c.off*.002),0,1);c.acc=avg(c.accs.filter(x=>x!=null));SFX.pop();renderControls();renderSide(true)}
+}
+
+// ===================== 車縫 =====================
+function resetSew(clearPins){
+ const sw=S.sew,raw=outline(S.body,.9,320),g0=70*D,g1=110*D;
+ const path=raw.filter(p=>!(p.t>g0&&p.t<g1)).map(p=>({...p,key:(p.t-g1+2*Math.PI)%(2*Math.PI)})).sort((a,b)=>a.key-b.key);
+ for(let k=0;k<path.length;k++){const a=path[Math.max(0,k-3)],b=path[k],c=path[Math.min(path.length-1,k+3)];
+  if(a===b||b===c){b.lim=.8;continue}
+  const cur=Math.abs(angDiff(Math.atan2(c.y-b.y,c.x-b.x),Math.atan2(b.y-a.y,b.x-a.x)));b.lim=clamp(.8-cur*1.6,.25,.8)}
+ // 有部件夾在縫線裡的地方，要放慢
+ PART_KEYS.forEach(k=>{const o=S.parts[k];if(o.id==='none')return;[-1,1].forEach(s=>{const th=(-90+s*o.a)*D;path.forEach(p=>{if(Math.abs(angDiff(p.t,th))<10*D){p.lim=Math.min(p.lim,.4);p.part=true}})})});
+ const pins=clearPins?[]:sw.pins.map(p=>({i:p.i,out:false}));
+ Object.assign(sw,{phase:clearPins?'pin':'sew',pins,path,idx:0,stitches:[],jams:0,pinHits:0,drift:0,jamUntil:0,done:false,acc:0,flash:'',flashT:0,backStart:false,backEnd:false,backHold:false,backT:0});
+}
+const GAP=50;
+function pinGaps(){const sw=S.sew,L=sw.path.length,ix=[0,...sw.pins.map(p=>p.i).sort((a,b)=>a-b),L-1],g=[];for(let i=0;i<ix.length-1;i++)if(ix[i+1]-ix[i]>GAP)g.push([ix[i],ix[i+1]]);return g}
+function pinnedNear(i){const sw=S.sew;return i<8||i>sw.path.length-8||sw.pins.some(p=>Math.abs(p.i-i)<=GAP/2)}
+function placePin(p){
+ const sw=S.sew;let bi=-1,bd=1e9;sw.path.forEach((q,i)=>{const d=dist(p,q);if(d<bd){bd=d;bi=i}});
+ if(bd>16)return;const ex=sw.pins.findIndex(x=>Math.abs(x.i-bi)<6);
+ if(ex>=0)sw.pins.splice(ex,1);else sw.pins.push({i:bi,out:false});SFX.pop();
+}
+function pullPin(){const sw=S.sew,p=sw.pins.filter(p=>!p.out&&p.i>sw.idx-2&&p.i<=sw.idx+35).sort((a,b)=>a.i-b.i)[0];if(p){p.out=true;SFX.pop()}}
+function processSew(q){
+ const sw=S.sew,now=performance.now();if(sw.done||now<sw.jamUntil)return;
+ let best=-1,bd=1e9;
+ for(let j=sw.idx;j<Math.min(sw.path.length,sw.idx+14);j++){const d=dist(q,sw.path[j]);if(d<bd){bd=d;best=j}}
+ if(bd>18)return;
+ const lim=sw.path[sw.idx].lim;
+ if(ptr.speed>lim){
+  if(!sw.assist){sw.jamUntil=now+400;sw.jams++;flash(sw,sw.path[sw.idx].part?'這裡夾著部件，布比較厚，要放慢！':'跳針了！轉角要放慢');SFX.jam();
+   sw.stitches.push({dx:q.x-CX,dy:q.y-CY,q:0,bad:true});return}
+  best=Math.min(best,sw.idx+1);
+ }
+ if(best>sw.idx){
+  const hit=sw.pins.find(p=>!p.out&&p.i>sw.idx&&p.i<=best);
+  if(hit){hit.out=true;sw.pinHits++;sw.jamUntil=now+1200;flash(sw,'撞到珠針，斷針了！要先按空白鍵拔掉');SFX.jam();SFX.no();return}
+  const dev={x:q.x-sw.path[best].x,y:q.y-sw.path[best].y};
+  for(let k=sw.idx+1;k<=best;k++){
+   sw.drift=pinnedNear(k)?Math.max(0,sw.drift-.3):Math.min(9,sw.drift+.09);
+   const p=sw.path[k],nx=p.x-CX,ny=p.y-CY,nl=Math.hypot(nx,ny)||1;
+   sw.stitches.push({dx:p.x-CX+dev.x*.8+nx/nl*sw.drift,dy:p.y-CY+dev.y*.8+ny/nl*sw.drift,q:clamp(1-(bd+sw.drift)/14,0,1),bad:false})}
+  if(sw.drift>3&&!flashing(sw))flash(sw,'沒有珠針固定，布在滑動！');
+  sw.idx=best;if(now-lastSfx>55){SFX.thunk();lastSfx=now}
+ }
+ if(sw.idx>=sw.path.length-1){sw.done=true;const good=sw.stitches.filter(s=>!s.bad);sw.acc=clamp(avg(good.map(s=>s.q))-sw.jams*.05-sw.pinHits*.06,0,1);SFX.pop();renderControls();renderSide(true)}
+}
+
+// ===================== 塞棉花 =====================
+function regionsFor(){
+ const regs=[{name:'身體',part:'body',side:0,fill:0,lump:0,early:false,small:false}];
+ PART_KEYS.forEach(k=>{const o=S.parts[k];if(o.id==='none'||o.nostuff)return;
+  [-1,1].forEach(s=>regs.push({name:(s<0?'左':'右')+o.rname,part:k,side:s,fill:0,lump:0,early:k!=='feet',small:true}))});
+ return regs;
+}
+function regionAt(p){
+ const regs=S.stuff.regs;if(!regs)return-1;
+ for(let i=regs.length-1;i>0;i--){const r=regs[i];if(pip(partPoly(r.part,r.side),p.x,p.y))return i}
+ return pip(dollOutline(120),p.x,p.y)?0:-1;
+}
+function openingPos(){return toDoll(0,R*shapeR(S.body,Math.PI/2)*.9)}
+function dropClump(p){
+ const st=S.stuff,cl=st.clump;st.clump=null;if(!cl)return;
+ const ri=regionAt(p);if(ri<0){flash(st,'棉花掉到桌上了。');return}
+ const r=st.regs[ri];
+ if(r.small&&cl.size>1.4){flash(st,`太大團了，塞不進${r.name}！按短一點，拉小團的。`);SFX.no();return}
+ if(r.early&&st.regs[0].fill>=.55){flash(st,`身體已經塞太滿，棉花推不到${r.name}了。末端要先塞！`);SFX.no();return}
+ const f=fab(r.part==='body'?'body':r.part),gain=cl.size*.08*f.mat.stretch*(r.small?1.7:1),lm=(f.mat.id==='knit'&&S.offGrain)?1.4:1;
+ r.fill=Math.min(1.35,r.fill+gain);r.lump=Math.min(1,r.lump+Math.max(0,cl.size-1)*.14*lm);st.squish=1;
+ for(let i=0;i<8;i++)st.parts.push({x:p.x,y:p.y,vx:(Math.random()-.5)*3,vy:(Math.random()-.5)*3,r:4+Math.random()*4,l:1});
+ SFX.puff();
+}
+function closePoints(){const op=openingPos();return[0,1,2,3,4].map(i=>({x:op.x-24+i*12,y:op.y}))}
+
+// ===================== 裝飾 =====================
+const POS={eyes:[0,-.22],nose:[0,-.04],mouth:[0,.1],cheek:[0,0],acc:[.55,-.72],body:[-.3,.45],neck:[0,.36]};
+function addDecor(id){
+ const d=DECOR_BY[id],[px,py]=POS[d.pos],same=S.decor.filter(x=>DECOR_BY[x.type].pos===d.pos).length;
+ S.decor.push({type:id,x:CX+px*R+same*12,y:CY+py*R+same*10,s:1,rot:0});S.sel=S.decor.length-1;SFX.pop();renderControls();renderSide(true);
+}
+function hitDecor(p){let best=-1,bs=1;S.decor.forEach((it,i)=>{const s=dist(p,it)/(DECOR_BY[it.type].hit*it.s);if(s<=bs){bs=s;best=i}});return best}
+
+// ===================== 輸入 =====================
+function toLocal(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+cv.addEventListener('pointerdown',e=>{
+ ensureAudio();cv.setPointerCapture(e.pointerId);const p=toLocal(e),right=e.button===2;
+ Object.assign(ptr,{down:true,x:p.x,y:p.y,lastT:performance.now(),speed:0,inside:true});
+ switch(S.step){
+ case'material':{const k=pickPartAt(p);if(k){S.tab=k;SFX.pop();renderControls()}ptr.down=false;break}
+ case'layout':{const L=S.layout,i=unitAt(p);L.sel=i;
+  if(i>=0&&right){ACT.rot();ptr.down=false;break}
+  if(i>=0){const u=L.units[i];L.drag={i,dx:p.x-u.x,dy:p.y-u.y}}renderControls();break}
+ case'cut':S.cut.trail.push(null);processCut(p);break;
+ case'sew':if(S.sew.phase==='pin'){placePin(p);ptr.down=false}else processSew(p);break;
+ case'stuff':{const st=S.stuff;
+  if(st.closing&&!st.closed){const cp=closePoints()[st.closeIdx];if(dist(p,cp)<18){st.closeIdx++;SFX.thunk();if(st.closeIdx>=5){st.closed=true;SFX.pop();renderControls()}}else flash(st,'點亮起來的那個縫點');break}
+  if(st.closed)break;
+  if(dist(p,BAG)<55){st.clump={size:.4,x:p.x,y:p.y};break}
+  if(regionAt(p)>=0)st.kneadAt={x:p.x,y:p.y};break}
+ case'decor':{const i=hitDecor(p);S.sel=i;if(i>=0){const it=S.decor[i];S.drag={dx:p.x-it.x,dy:p.y-it.y};S.decor.push(S.decor.splice(i,1)[0]);S.sel=S.decor.length-1}else S.drag=null;renderControls();break}
+ }
+});
+function pickPartAt(p){
+ if(S.parts.belly.id!=='none'&&pip(bellyPoly(),p.x,p.y))return'belly';
+ for(const k of['feet','arms','ears']){const o=S.parts[k];if(o.id==='none')continue;for(const s of[-1,1]){if(o.inner&&pip(innerPoly(k,s),p.x,p.y))return'earInner';if(pip(partPoly(k,s),p.x,p.y))return k}}
+ return pip(dollOutline(120),p.x,p.y)?'body':null;
+}
+cv.addEventListener('pointermove',e=>{
+ const p=toLocal(e),now=performance.now(),dt=Math.max(1,now-ptr.lastT),prev={x:ptr.x,y:ptr.y},d=dist(p,prev);
+ ptr.speed=ptr.speed*.55+(d/dt)*.45;ptr.lastT=now;ptr.lastMove=now;ptr.x=p.x;ptr.y=p.y;ptr.inside=true;
+ if(!ptr.down)return;
+ if(S.step==='cut'||S.step==='sew'){const steps=Math.max(1,Math.ceil(d/3));
+  for(let i=1;i<=steps;i++){const q={x:prev.x+(p.x-prev.x)*i/steps,y:prev.y+(p.y-prev.y)*i/steps};S.step==='cut'?processCut(q):processSew(q)}}
+ if(S.step==='layout'&&S.layout.drag){const L=S.layout,u=L.units[L.drag.i];u.x=clamp(p.x-L.drag.dx,0,W);u.y=clamp(p.y-L.drag.dy,0,H);layoutCheck()}
+ if(S.step==='stuff'){const st=S.stuff;if(st.clump){st.clump.x=p.x;st.clump.y=p.y}
+  else if(st.kneadAt){const ri=regionAt(p);if(ri>=0){const r=st.regs[ri];r.lump=Math.max(0,r.lump-d*.0012);st.squish=Math.min(1,st.squish+d*.01);if(now-lastSfx>120&&d>2){SFX.squish();lastSfx=now}}}}
+ if(S.step==='decor'&&S.drag&&S.sel>=0){const it=S.decor[S.sel];it.x=clamp(p.x-S.drag.dx,0,W);it.y=clamp(p.y-S.drag.dy,0,H)}
+});
+const up=e=>{
+ if(!ptr.down)return;ptr.down=false;if(!S)return;
+ if(S.step==='stuff'){if(S.stuff.clump)dropClump(e?toLocal(e):ptr);S.stuff.kneadAt=null}
+ if(S.step==='layout'&&S.layout.drag){S.layout.drag=null;layoutCheck();renderControls()}
+ S.drag=null;
+};
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('pointerleave',()=>{ptr.inside=false});
+cv.addEventListener('wheel',e=>{if(S.step!=='decor'||S.sel<0)return;e.preventDefault();const it=S.decor[S.sel];it.s=clamp(it.s*(e.deltaY<0?1.08:1/1.08),.4,2.6)},{passive:false});
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('keydown',e=>{
+ if(S.step==='sew'&&S.sew.phase==='sew'){
+  if(e.code==='Space'){e.preventDefault();if(!e.repeat)pullPin()}
+  if(e.code==='KeyB'){e.preventDefault();S.sew.backHold=true}}
+ if(S.step==='layout'&&e.code==='KeyR'){e.preventDefault();ACT.rot()}
+ if(S.step==='decor'&&S.sel>=0&&(e.key==='Delete'||e.key==='Backspace')){e.preventDefault();ACT.dz('del')}
+});
+window.addEventListener('keyup',e=>{if(e.code==='KeyB'&&S.step==='sew')S.sew.backHold=false;if(e.code==='Space'&&S.step==='sew')e.preventDefault()});
+const ctrl=document.getElementById('controls');
+ctrl.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&!b.disabled){ensureAudio();ACT[b.dataset.act](b.dataset.arg);if(document.activeElement)document.activeElement.blur()}});
+ctrl.addEventListener('pointerdown',e=>{if(e.target.closest('[data-hold=back]')){ensureAudio();S.sew.backHold=true}});
+window.addEventListener('pointerup',()=>{if(S&&S.step==='sew')S.sew.backHold=false});
+
+// ===================== 動作 =====================
+const ACT={
+ accept(){setStep('material')},
+ skip(){startOrder()},
+ tab(slot){S.tab=slot;renderControls()},
+ body(id){S.body=BODIES.find(b=>b.id===id);SFX.pop();renderControls()},
+ part(id){const k=S.tab;S.parts[k]=PARTS[k].opts.find(o=>o.id===id);if(k==='ears'&&!S.parts.ears.inner&&S.tab==='earInner')S.tab='ears';SFX.pop();renderControls()},
+ mat(id){const s=S.tab;if(s==='body')S.fab.body.mat=MAT_BY[id];else S.fab[s]={...(S.fab[s]||{}),mat:MAT_BY[id]};SFX.pop();renderControls();renderSide(true)},
+ color(id){const s=S.tab;if(s==='body')S.fab.body.color=COLOR_BY[id];else S.fab[s]={...(S.fab[s]||{}),color:COLOR_BY[id]};SFX.pop();renderControls()},
+ same(){const s=S.tab;if(s!=='body'){S.fab[s]=null;SFX.pop();renderControls()}},
+ toLayout(){setStep('layout')},
+ bolt(i){S.layout.cur=+i;S.layout.sel=-1;renderControls()},
+ rot(){const L=S.layout;if(L.sel<0)return;const u=L.units[L.sel];u.rot=(u.rot+1)%4;SFX.pop();layoutCheck();renderControls()},
+ toCut(){commitLayout();setStep('cut')},
+ recut(){resetCut();renderControls()},
+ nextPiece(){S.cut.which++;resetCut();renderControls()},
+ toSew(){setStep('sew')},
+ startSew(){S.sew.phase='sew';renderControls()},
+ assist(){S.sew.assist=!S.sew.assist;renderControls()},
+ resew(){resetSew(false);renderControls();renderSide(true)},
+ toStuff(){setStep('stuff')},
+ unstuff(){const b=S.stuff.regs[0];b.fill=Math.max(0,b.fill-.08);SFX.puff()},
+ close(){S.stuff.closing=true;S.stuff.closeIdx=0;renderControls()},
+ toDecor(){setStep('decor')},
+ add(id){addDecor(id)},
+ dz(a){if(S.sel<0)return;const it=S.decor[S.sel];
+  if(a==='+')it.s=clamp(it.s*1.12,.4,2.6);if(a==='-')it.s=clamp(it.s/1.12,.4,2.6);if(a==='l')it.rot-=.2;if(a==='r')it.rot+=.2;
+  if(a==='del'){S.decor.splice(S.sel,1);S.sel=-1;renderControls()}renderSide(true)},
+ deliver(){setStep('deliver')},
+ save(){const a=document.createElement('a');a.download=`娃娃_給${S.order.who}.png`;a.href=cv.toDataURL('image/png');a.click()},
+ next(){startOrder()},
+};
+
+// ===================== 介面 =====================
+function renderSteps(){
+ const i=STEPS.findIndex(s=>s[0]===S.step);
+ document.getElementById('steps').innerHTML=STEPS.map(([id,n],j)=>`<span class="step ${j===i?'on':j<i?'done':''}">${j<i?'✓ ':''}${n}</span>`).join('');
+}
+const chip=(on,act,arg,inner)=>`<button class="chip ${on?'on':''}" data-act="${act}" data-arg="${arg}">${inner}</button>`;
+function materialPanel(){
+ const s=S.tab,tabs=SLOTS.filter(([k])=>k!=='earInner'||S.parts.ears.inner);
+ let h=`<div class="tabs">${tabs.map(([k,n])=>{const on=k===s,used=k==='body'||usedSlots().includes(k),f=designReady()&&used?fab(k):null;
+  return`<button class="tab ${on?'on':''}" data-act="tab" data-arg="${k}">${f?`<i class="sw" style="background:${f.color.hex}"></i>`:''}${n}${k!=='body'&&k!=='earInner'&&S.parts[k].id!=='none'?'・'+S.parts[k].name:''}</button>`}).join('')}</div>`;
+ if(s==='body')h+=`<div class="group"><h4>身體造型</h4><div class="chips">${BODIES.map(b=>chip(S.body===b,'body',b.id,`<b>${b.name}</b>`)).join('')}</div></div>`;
+ else if(s!=='earInner')h+=`<div class="group"><h4>${PARTS[s].label}造型</h4><div class="chips">${PARTS[s].opts.map(o=>chip(S.parts[s]===o,'part',o.id,`<b>${o.name}</b>`)).join('')}</div></div>`;
+ const hasPart=s==='body'||s==='earInner'||S.parts[s].id!=='none';
+ if(hasPart){const own=s==='body'?S.fab.body:(S.fab[s]||{}),cur=designReady()?fab(s):own,inherit=s!=='body'&&!S.fab[s];
+  h+=`<div class="group"><h4>${SLOT_NAME[s]}的布料${s!=='body'?`　<button class="btn small ${inherit?'on':''}" data-act="same">跟身體一樣</button>`:''}</h4><div class="chips">${MATERIALS.map(m=>chip(cur.mat===m&&(s==='body'||!inherit||true),'mat',m.id,`<b>${m.name}</b><em>每 10cm $${m.p10}</em><small>${m.desc}</small>`)).join('')}</div></div>
+  <div class="group"><h4>${SLOT_NAME[s]}的顏色</h4><div class="chips">${COLORS.map(c=>chip(cur.color===c,'color',c.id,`<b><i class="sw" style="background:${c.hex}"></i>${c.name}</b>`)).join('')}</div></div>`}
+ h+=`<div class="row"><button class="btn main" data-act="toLayout" ${designReady()?'':'disabled'}>設計好了，去排版 →</button></div>`;
+ return h;
+}
+function renderControls(){
+ let h='<div id="status"></div>';
+ switch(S.step){
+  case'order':h+=`<div class="row"><button class="btn main" data-act="accept">接下委託 →</button><button class="btn" data-act="skip">換一位客人</button></div>`;break;
+  case'material':h+=materialPanel();break;
+  case'layout':{const L=S.layout,ch=L.check;
+   h+=`<div class="chips" style="margin-bottom:6px">${L.bolts.map((b,i)=>chip(i===L.cur,'bolt',i,`<b><i class="sw" style="background:${b.color.hex}"></i>布捲 ${i+1}：${b.mat.name}・${b.color.name} ${ch.bInfo[i].valid?'<span class="y">✔</span>':''}</b><small>${b.units.map(u=>L.units[u].name).join('、')}</small>`)).join('')}</div>
+   <div class="row"><button class="btn" data-act="rot" ${L.sel>=0?'':'disabled'}>↻ 旋轉選取的布片（<kbd>R</kbd> 或右鍵）</button>
+   <button class="btn main" data-act="toCut" ${ch.valid?'':'disabled'}>確定排版，買布 $${ch.cost} →</button></div>`;break}
+  case'cut':{const c=S.cut,last=c.which>=c.order.length-1;h+=`<div class="row">${c.done?(last?'<button class="btn main" data-act="toSew">下一步：車縫 →</button>':`<button class="btn main" data-act="nextPiece">剪下一塊：${S.layout.units[c.order[c.which+1]].name} →</button>`):''}<button class="btn" data-act="recut">重剪這一塊</button></div>`;break}
+  case'sew':{const sw=S.sew;
+   h+=sw.phase==='pin'?`<div class="row"><button class="btn main" data-act="startSew">珠針放好了，開始車縫 →</button></div>`
+   :`<div class="row">${sw.done?'<button class="btn main" data-act="toStuff">下一步：塞棉花 →</button>':''}<button class="btn" data-hold="back">回針（按住，或按住 <kbd>B</kbd>）</button><button class="btn" data-act="assist">車縫輔助：${sw.assist?'開':'關'}</button><button class="btn" data-act="resew">拆線重來</button></div>`;break}
+  case'stuff':h+=S.stuff.closed?`<div class="row"><button class="btn main" data-act="toDecor">下一步：裝飾 →</button></div>`
+   :S.stuff.closing?'':`<div class="row"><button class="btn" data-act="unstuff">從身體掏出一點棉花</button><button class="btn main" id="closeBtn" data-act="close" disabled>塞好了，縫合開口</button></div>`;break;
+  case'decor':{const sel=S.sel>=0;
+   h+=`<div class="group"><h4>點一下加到娃娃上（可以加很多個）</h4><div class="chips">${DECOR.map(d=>`<button class="chip" data-act="add" data-arg="${d.id}"><b>${d.name}</b><em>$${d.cost}</em></button>`).join('')}</div></div>
+   <div class="row"><span style="font-size:13px;color:var(--muted)">選取的配件：</span>
+   <button class="btn small" data-act="dz" data-arg="-" ${sel?'':'disabled'}>縮小</button><button class="btn small" data-act="dz" data-arg="+" ${sel?'':'disabled'}>放大</button>
+   <button class="btn small" data-act="dz" data-arg="l" ${sel?'':'disabled'}>↺ 旋轉</button><button class="btn small" data-act="dz" data-arg="r" ${sel?'':'disabled'}>↻ 旋轉</button>
+   <button class="btn small" data-act="dz" data-arg="del" ${sel?'':'disabled'}>刪除</button></div>
+   <div class="row"><button class="btn main" data-act="deliver">完成，交給${S.order.who} →</button></div>`;break}
+  case'deliver':{const r=S.result,bar=(n,v)=>`<div class="bar"><span>${n}</span><i><b style="width:${pct(v)}"></b></i><span>${pct(v)}</span></div>`;
+   h+=`<div style="font-size:14px;color:var(--muted)">交件後才知道：${S.order.who}在意的是——</div>
+   <div class="review">${r.review.map(x=>`<span>${x.text} <b class="${x.ok?'y':'n'}">${x.ok?'✔':'✘'}</b></span>`).join('')}</div>
+   <div class="bars">${bar('符合期待',r.tagS)}${bar('柔軟度',r.softS)}${bar('手工品質',r.craft)}</div>
+   <div style="font-size:14px">成本 $${r.cost} ／ 預算 $${S.order.budget} ・ 收到 <b>$${r.pay}</b> ・ 利潤 <b class="${r.profit>=0?'y':'n'}">${r.profit>=0?'+':''}$${r.profit}</b> ・ 聲望 ${r.stars-3>=0?'+':''}${r.stars-3}</div>
+   ${r.comments.length?`<ul class="comments">${r.comments.map(c=>`<li>${c}</li>`).join('')}</ul>`:''}
+   <div class="row"><button class="btn main" data-act="next">下一位客人 →</button><button class="btn" data-act="save">存成圖片</button></div>`;break}
+ }
+ ctrl.innerHTML=h;updateStatus();
+}
+function updateStatus(){
+ const el=document.getElementById('status');if(!el)return;let t='';
+ switch(S.step){
+  case'order':t='有客人上門了。仔細讀客人說的話——你要自己判斷對方想要什麼樣的娃娃。';break;
+  case'material':t=designReady()?`設計你的娃娃：每個部位可以選造型和布料。也可以直接點畫面上的部位。<span class="tip">（用到 ${new Set(usedSlots().map(s=>fabKey(fab(s)))).size} 種布）</span>`:'先選身體的布料和顏色，其他部位預設會跟身體一樣。';break;
+  case'layout':{const L=S.layout,ch=L.check,b=L.bolts[L.cur],bi=ch.bInfo[L.cur],w=[];
+   if(!bi.allIn)w.push('把這捲布的布片都拖到布上');if(bi.ov)w.push('布片重疊了');
+   b.units.forEach(i=>{const u=L.units[i],x=ch.uInfo[i];if(x.inside&&x.flaws)w.push(`${u.name}蓋到污漬`);if(x.inside&&!x.grain)w.push(`${u.name}${b.mat.grain==='one'?'毛向':'布紋'}不對`)});
+   const rest=ch.bInfo.filter((x,i)=>i!==L.cur&&!x.valid).length;
+   t=`布捲 ${L.cur+1}/${L.bolts.length}：${b.mat.name}・${b.color.name}。${bi.valid?`用布 <b>${bi.len}cm</b>，$${bi.cost}。`:''}${w.length?' <span class="warn">'+w.join('・')+'</span>':''}${rest?` <span class="tip">（還有 ${rest} 捲布沒排好）</span>`:''}<br><span class="tip">「×2」「×4」代表布對折或折兩次一起剪。箭頭要跟布上的箭頭同方向（不織布例外）。</span>`;break}
+  case'cut':{const c=S.cut,u=curUnit(),tag=u.mult===4?'（折兩次，一次剪 4 片）':u.mult===2?'（對折，一次剪 2 片）':'（單層）';
+   t=c.done?`${u.name}剪好了！精準度 ${pct(c.accs[c.which])}`:`剪${u.name}${tag}：按住滑鼠沿著虛線剪。進度 ${pct(cutCoverage())}`;break}
+  case'sew':{const sw=S.sew,warn=flashing(sw)?` <span class="warn">${sw.flash}</span>`:'';
+   if(sw.phase==='pin'){const g=pinGaps().length;t=`把部件夾進前後片中間，用珠針固定：點虛線放珠針（再點一次拿掉）。已放 ${sw.pins.length} 根${g?`，<span class="warn">還有 ${g} 段沒固定（橘色）</span>`:'，都固定好了 ✔'}<br><span class="tip">耳朵、手、腳這些小部件已經先車好了。車的時候，珠針要在針碰到之前按 <kbd>空白鍵</kbd> 拔掉。</span>`}
+   else t=sw.done?`車好了！品質 ${pct(sw.acc)}・回針：開頭 ${sw.backStart?'✔':'✘'} 結尾 ${sw.backEnd?'✔':'✘'}${!sw.backEnd?' <span class="warn">結尾還沒回針（按住 B）</span>':''}${warn}`
+    :`按住滑鼠，從綠點沿著虛線車到紅點。進度 ${pct(sw.idx/(sw.path.length-1))}・回針 開頭${sw.backStart?'✔':'✘'}/結尾${sw.backEnd?'✔':'✘'}・跳針 ${sw.jams}・斷針 ${sw.pinHits}${warn}<br><span class="tip">開頭車幾針後、結尾車到底時，按住 <kbd>B</kbd> 回針。遇到珠針按 <kbd>空白鍵</kbd>。夾著部件的地方（藍色）布比較厚，要放慢。</span>`;break}
+  case'stuff':{const st=S.stuff,warn=flashing(st)?` <span class="warn">${st.flash}</span>`:'';
+   t=st.closed?'開口縫好了！':st.closing?`點縫點把開口縫起來（${st.closeIdx}/5）${warn}`
+   :`整體手感：<b>${softLabel(overallSoft())}</b>${st.leaked&&!(S.sew.backStart&&S.sew.backEnd)?' <span class="warn">線頭沒回針，棉花從縫線漏出來了！快塞好縫起來</span>':''}${warn}<br><span class="tip">從棉花袋按住拉出棉花（按越久越大團），拖到要塞的部位放開。耳朵、手只能塞小團，而且要在身體塞滿之前先塞。在娃娃上來回揉，可以把凹凸揉平。</span>`;break}
+  case'decor':t=`拖曳可以移動配件，滾輪或按鈕可以縮放。目前花費 $${cost()} ／ 預算 $${S.order.budget}`;break;
+ }
+ if(el.dataset.t!==t){el.innerHTML=t;el.dataset.t=t}
+}
+let sideCache='';
+function renderSide(force){
+ const o=S.order,dc=decorCost(),fc=S.fabricCost,c=fc+dc;
+ const h=`<div class="card"><div class="who"><span class="em">${o.emoji}</span>${o.who}</div><p class="quote">「${o.text}」</p><div style="font-size:14px">預算 <b>$${o.budget}</b></div></div>
+ <div class="card"><h3>🧾 帳本</h3><ul class="check">
+  <li><span>布料</span><span>${fc?`$${fc}`:'（排版後計價）'}</span></li>
+  <li><span>配件</span><span>$${dc}</span></li>
+  <li><span>合計 ／ 預算</span><span class="${c<=o.budget?'':'n'}">$${c} ／ $${o.budget}</span></li>
+  <li><span>手工</span><span class="q">裁布 ${S.cut.accs.length?pct(S.cut.acc):'—'} ・ 車縫 ${S.sew.done?pct(S.sew.acc):'—'}</span></li></ul></div>
+ <div class="card wallet"><span>💰 $${meta.coins}</span><span>⭐ 聲望 ${meta.rep}</span><span>🧸 ${meta.done} 件</span></div>
+ <div class="card tips">這是玩法原型 v0.3：只有布偶（軟材質）。<br>每個部位可以選造型和布料；客人的需求要靠你自己解讀，交件後才會知道客人在意什麼。</div>`;
+ if(force||h!==sideCache){document.getElementById('side').innerHTML=h;sideCache=h}
+}
+
+// ===================== 繪製 =====================
+function bgPlain(){ctx.fillStyle='#fdf8f1';ctx.fillRect(0,0,W,H);ctx.fillStyle='rgba(200,170,140,.18)';for(let y=20;y<H;y+=28)for(let x=(y/28%2)*14+10;x<W;x+=28){circle(ctx,x,y,1.5);ctx.fill()}}
+function bgMat(){ctx.fillStyle='#6fa98b';ctx.fillRect(0,0,W,H);ctx.strokeStyle='rgba(255,255,255,.18)';ctx.lineWidth=1;ctx.beginPath();for(let x=0;x<W;x+=25){ctx.moveTo(x,0);ctx.lineTo(x,H)}for(let y=0;y<H;y+=25){ctx.moveTo(0,y);ctx.lineTo(W,y)}ctx.stroke()}
+function bgShop(){const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#fbeee0');g.addColorStop(1,'#f3d9bf');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ ctx.fillStyle='#e7c9a8';ctx.fillRect(40,70,220,10);ctx.fillRect(540,70,220,10);
+ ctx.font=`34px ${EMOJI_FONT}`;ctx.textAlign='center';ctx.textBaseline='bottom';['🧸','🐰','🧶'].forEach((e,i)=>ctx.fillText(e,80+i*70,70));['🪡','✂️','🧵'].forEach((e,i)=>ctx.fillText(e,580+i*70,70));
+ ctx.fillStyle='#c98b5e';ctx.fillRect(0,440,W,120);ctx.fillStyle='#b0764c';ctx.fillRect(0,440,W,10)}
+function wrap(text,maxW){const lines=[];let cur='';for(const ch of text){if(ctx.measureText(cur+ch).width>maxW){lines.push(cur);cur=ch}else cur+=ch}if(cur)lines.push(cur);return lines}
+function bubble(x,y,w,text,size=19,tail='left'){
+ ctx.font=`${size}px ${UI_FONT}`;const lines=wrap(text,w-36),lh=size*1.6,h=lines.length*lh+28;
+ ctx.fillStyle='#fff';ctx.strokeStyle='#e2cdb6';ctx.lineWidth=2;rrect(ctx,x,y,w,h,16);ctx.fill();ctx.stroke();
+ ctx.beginPath();if(tail==='left'){ctx.moveTo(x+2,y+h*.55);ctx.lineTo(x-18,y+h*.7);ctx.lineTo(x+2,y+h*.75)}else{ctx.moveTo(x+w*.6,y+h-2);ctx.lineTo(x+w*.7,y+h+18);ctx.lineTo(x+w*.75,y+h-2)}ctx.fill();
+ ctx.fillStyle='#4a3b32';ctx.textAlign='left';ctx.textBaseline='top';lines.forEach((l,i)=>ctx.fillText(l,x+18,y+14+i*lh));return h;
+}
+function hint(text){ctx.font=`bold 16px ${UI_FONT}`;const w=ctx.measureText(text).width+28;ctx.fillStyle='rgba(255,255,255,.9)';rrect(ctx,W/2-w/2,14,w,32,16);ctx.fill();ctx.fillStyle='#4a3b32';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,W/2,30)}
+function drawArrow(x,y,a,len,color,w=2){const dx=-Math.sin(a),dy=Math.cos(a);ctx.strokeStyle=ctx.fillStyle=color;ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(x-dx*len/2,y-dy*len/2);ctx.lineTo(x+dx*len/2,y+dy*len/2);ctx.stroke();
+ const hx=x+dx*len/2,hy=y+dy*len/2;ctx.beginPath();ctx.moveTo(hx,hy);ctx.lineTo(hx-dx*6+dy*4,hy-dy*6-dx*4);ctx.lineTo(hx-dx*6-dy*4,hy-dy*6+dx*4);ctx.closePath();ctx.fill()}
+
+function render(now){
+ ctx.clearRect(0,0,W,H);
+ switch(S.step){
+ case'order':{bgShop();const o=S.order;ctx.font=`120px ${EMOJI_FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(o.emoji,190,300+Math.sin(now/500)*4);
+  ctx.font=`bold 20px ${UI_FONT}`;ctx.fillStyle='#4a3b32';ctx.fillText(o.who,190,395);
+  const h=bubble(320,150,440,o.text);ctx.font=`bold 18px ${UI_FONT}`;ctx.fillStyle='#8a5a3a';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(`預算：$${o.budget}`,338,150+h+16);break}
+ case'material':{bgPlain();hint('設計：點部位切換，選造型和布料');
+  if(designReady())drawDoll(now,{decor:false,highlight:S.tab});
+  else{const pts=outline(S.body,1);ctx.setLineDash([8,6]);ctx.strokeStyle='#cbb59e';ctx.lineWidth=2;pathFrom(pts);ctx.stroke();ctx.setLineDash([]);ctx.font=`16px ${UI_FONT}`;ctx.fillStyle='#9a8778';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('先選身體的布料和顏色',CX,CY)}
+  break}
+ case'layout':{bgPlain();const L=S.layout,ch=L.check,b=L.bolts[L.cur],bi=ch.bInfo[L.cur];
+  ctx.fillStyle='#8a7565';ctx.font=`11px ${UI_FONT}`;ctx.textAlign='center';ctx.textBaseline='bottom';ctx.strokeStyle='#bba895';ctx.lineWidth=1;ctx.beginPath();
+  for(let x=0;x<=FAB.w;x+=10){ctx.moveTo(FAB.x+x,FAB.y-2);ctx.lineTo(FAB.x+x,FAB.y-(x%50?5:10))}ctx.stroke();for(let x=50;x<=FAB.w;x+=50)ctx.fillText(x+'cm',FAB.x+x,FAB.y-11);
+  ctx.save();ctx.shadowColor='rgba(0,0,0,.2)';ctx.shadowBlur=10;ctx.fillStyle=getTile(b.mat,b.color.hex);ctx.fillRect(FAB.x,FAB.y,FAB.w,FAB.h);ctx.restore();
+  ctx.strokeStyle=shade(b.color.hex,-.3);ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(FAB.x,FAB.y);ctx.lineTo(FAB.x+FAB.w,FAB.y);ctx.moveTo(FAB.x,FAB.y+FAB.h);ctx.lineTo(FAB.x+FAB.w,FAB.y+FAB.h);ctx.stroke();
+  const ac=lum(b.color.hex)>.5?'rgba(60,40,30,.3)':'rgba(255,255,255,.4)';
+  if(b.mat.grain!=='none')for(let x=FAB.x+45;x<FAB.x+FAB.w;x+=90)for(const y of[FAB.y+30,FAB.y+FAB.h-30])drawArrow(x,y,0,24,ac,1.5);
+  b.flaws.forEach(f=>drawStain(f.x,f.y));
+  if(bi.valid){const x=FAB.x+bi.len;ctx.setLineDash([6,5]);ctx.strokeStyle='#e07a5f';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,FAB.y-4);ctx.lineTo(x,FAB.y+FAB.h+4);ctx.stroke();ctx.setLineDash([]);
+   ctx.fillStyle='rgba(253,248,241,.55)';ctx.fillRect(x,FAB.y,FAB.x+FAB.w-x,FAB.h);ctx.font=`bold 14px ${UI_FONT}`;ctx.fillStyle='#c9603f';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(`✂ ${bi.len}cm・$${bi.cost}`,x+6,FAB.y+FAB.h+6)}
+  ctx.font=`14px ${UI_FONT}`;ctx.fillStyle='#9a8778';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText('布片（拖到上面的布上）',40,FAB.y+FAB.h+22);
+  b.units.forEach(i=>{const u=L.units[i],P=ch.polys[i],x=ch.uInfo[i];drawBody(P,b.mat,b.color.hex,.05,u.x,u.y,u.size*LS*.5,2);
+   if(x.ov){ctx.fillStyle='rgba(208,83,74,.28)';pathFrom(P);ctx.fill()}
+   if(i===L.sel){ctx.setLineDash([5,4]);ctx.strokeStyle='#e07a5f';ctx.lineWidth=2;pathFrom(P);ctx.stroke();ctx.setLineDash([])}
+   const a=u.rot*Math.PI/2,big=u.size*LS>60;if(b.mat.grain!=='none')drawArrow(u.x,u.y,a,big?30:16,x.grain?'#2f7d52':'#d0534a',2.2);
+   const bb=bbox(P);ctx.font=`bold 12px ${UI_FONT}`;ctx.textAlign='center';ctx.textBaseline='top';const lb=`${u.name}×${u.mult}`,lw=ctx.measureText(lb).width+8;
+   ctx.fillStyle='rgba(255,255,255,.8)';rrect(ctx,u.x-lw/2,bb.y1+3,lw,16,5);ctx.fill();ctx.fillStyle='rgba(60,40,30,.85)';ctx.fillText(lb,u.x,bb.y1+5)});
+  hint('排版：把布片排到布上，越省布越便宜');break}
+ case'cut':{bgMat();const c=S.cut,u=curUnit(),bf=S.layout.bolts[u.bolt];
+  if(!c.done||now-c.doneAt<600){const a=c.done?1-(now-c.doneAt)/600:1;ctx.globalAlpha=a;ctx.fillStyle=getTile(bf.mat,bf.color.hex);ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=12;rrect(ctx,130,80,540,430,6);ctx.fill();ctx.shadowBlur=0;
+   if(u.mult>1){ctx.fillStyle='rgba(0,0,0,.08)';rrect(ctx,136,86,540,430,6);ctx.fill()}
+   c.flaws.forEach(f=>drawStain(f.x,f.y,c.z));ctx.globalAlpha=1}
+  if(c.done){const t=clamp((now-c.doneAt)/400,0,1);groundShadow(c.pts);for(let k=u.mult-1;k>=0;k--){ctx.save();ctx.translate(k*8*t,k*8*t);drawBody(c.pts,bf.mat,bf.color.hex,.05*t,CX,CY,u.size*c.z*.5,2.5);ctx.restore()}c.flaws.forEach(f=>{if(pip(c.pts,f.x,f.y))drawStain(f.x,f.y,c.z)})}
+  else{ctx.setLineDash([9,7]);ctx.lineWidth=2.5;ctx.strokeStyle=shade(bf.color.hex,lum(bf.color.hex)>.5?-.6:.7);pathFrom(c.pts);ctx.stroke();ctx.setLineDash([]);
+   ctx.lineWidth=4;ctx.strokeStyle='rgba(255,255,255,.9)';ctx.beginPath();c.pts.forEach((p,k)=>{const k2=(k+1)%c.pts.length;if(c.cov[k]&&c.cov[k2]){ctx.moveTo(p.x,p.y);ctx.lineTo(c.pts[k2].x,c.pts[k2].y)}});ctx.stroke();
+   ctx.lineWidth=1.5;ctx.strokeStyle='rgba(208,83,74,.8)';ctx.beginPath();let pen=false;for(const t of c.trail){if(!t||t.ok){pen=false;continue}if(!pen){ctx.moveTo(t.x,t.y);pen=true}else ctx.lineTo(t.x,t.y)}ctx.stroke()}
+  hint(`裁布 ${c.which+1}/${c.order.length}：${u.name} ×${u.mult}${c.done?' 剪好了！':''}`);
+  if(ptr.inside&&!c.done){ctx.font=`30px ${EMOJI_FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.save();ctx.translate(ptr.x,ptr.y);ctx.rotate(ptr.down?Math.sin(now/40)*.25:0);ctx.fillText('✂️',0,0);ctx.restore()}
+  break}
+ case'sew':{bgPlain();const sw=S.sew;drawDoll(now,{decor:false});
+  ctx.setLineDash([4,5]);ctx.lineWidth=2;ctx.strokeStyle=lum(fab('body').color.hex)>.5?'rgba(80,50,40,.55)':'rgba(255,255,255,.7)';ctx.beginPath();sw.path.forEach((p,k)=>{if(k>=sw.idx)k===sw.idx?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y)});ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(90,140,220,.55)';ctx.lineWidth=6;ctx.lineCap='round';ctx.beginPath();let pen=false;sw.path.forEach((p,k)=>{if(p.part&&k>=sw.idx){pen?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y);pen=true}else pen=false});ctx.stroke();
+  ctx.strokeStyle='rgba(240,150,60,.75)';ctx.lineWidth=5;pinGaps().forEach(([a,b])=>{const s=Math.max(a,sw.idx);if(s>=b)return;ctx.beginPath();for(let k=s;k<=b;k++)k===s?ctx.moveTo(sw.path[k].x,sw.path[k].y):ctx.lineTo(sw.path[k].x,sw.path[k].y);ctx.stroke()});
+  sw.stitches.filter(s=>s.bad).forEach(s=>{ctx.strokeStyle='#d0534a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(CX+s.dx-5,CY+s.dy-5);ctx.lineTo(CX+s.dx+5,CY+s.dy+5);ctx.moveTo(CX+s.dx+5,CY+s.dy-5);ctx.lineTo(CX+s.dx-5,CY+s.dy+5);ctx.stroke()});
+  sw.pins.forEach(p=>{if(p.out)return;const q=sw.path[p.i],near=sw.phase==='sew'&&p.i>sw.idx&&p.i<=sw.idx+35,dx=q.x-CX,dy=q.y-CY,l=Math.hypot(dx,dy);
+   ctx.strokeStyle='#9aa0a8';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(q.x-dx/l*14,q.y-dy/l*14);ctx.lineTo(q.x+dx/l*10,q.y+dy/l*10);ctx.stroke();
+   ctx.fillStyle=near?(Math.floor(now/150)%2?'#ff5a4a':'#ffd54a'):'#e8577a';circle(ctx,q.x+dx/l*12,q.y+dy/l*12,near?7:5.5);ctx.fill()});
+  const st=sw.path[0],en=sw.path[sw.path.length-1];ctx.fillStyle='#3d9a66';circle(ctx,st.x,st.y,7);ctx.fill();ctx.fillStyle='#d0534a';circle(ctx,en.x,en.y,7);ctx.fill();
+  if(sw.phase==='sew'&&!sw.done){const cur=sw.path[sw.idx];ctx.strokeStyle='rgba(61,154,102,.9)';ctx.lineWidth=2;circle(ctx,cur.x,cur.y,11+Math.sin(now/150)*2);ctx.stroke()}
+  if(sw.phase==='sew'){
+   const lim=sw.done?.8:sw.path[sw.idx].lim,mx=1.2,bx=720,by=90,bh=300;
+   ctx.fillStyle='rgba(255,255,255,.9)';rrect(ctx,bx-14,by-34,64,bh+64,12);ctx.fill();
+   ctx.fillStyle='#e6efe6';ctx.fillRect(bx,by,22,bh);ctx.fillStyle='rgba(208,83,74,.25)';ctx.fillRect(bx,by,22,bh*(1-lim/mx));
+   const sp=clamp(ptr.down?ptr.speed:0,0,mx);ctx.fillStyle=sp>lim?'#d0534a':'#3d9a66';ctx.fillRect(bx,by+bh*(1-sp/mx),22,bh*sp/mx);
+   ctx.strokeStyle='#d0534a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(bx-4,by+bh*(1-lim/mx));ctx.lineTo(bx+26,by+bh*(1-lim/mx));ctx.stroke();
+   ctx.font=`13px ${UI_FONT}`;ctx.fillStyle='#4a3b32';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('車速',bx+11,by-16);ctx.fillText(sw.assist?'輔助中':'',bx+11,by+bh+16);
+   if(sw.backHold&&sw.backT>0){ctx.strokeStyle='#e07a5f';ctx.lineWidth=5;ctx.beginPath();ctx.arc(ptr.x,ptr.y,22,-Math.PI/2,-Math.PI/2+Math.PI*2*sw.backT/.6);ctx.stroke()}}
+  hint(sw.phase==='pin'?'先放珠針：點虛線放一根（再點一次拿掉）':sw.done?'車好了！':'從綠點車到紅點・空白鍵拔珠針・B 回針');
+  if(ptr.inside&&sw.phase==='sew'&&!sw.done){const jam=now<sw.jamUntil,bob=ptr.down&&!jam?Math.abs(Math.sin(now/35))*6:0,jx=jam?Math.sin(now/20)*3:0;
+   ctx.save();ctx.translate(ptr.x+jx,ptr.y);ctx.fillStyle='rgba(120,125,135,.85)';rrect(ctx,-14,-6,28,10,4);ctx.fill();ctx.strokeStyle='#666';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,-34);ctx.lineTo(0,-6+bob);ctx.stroke();ctx.fillStyle='#555';ctx.fillRect(-6,-44,12,12);ctx.restore()}
+  if(ptr.inside&&sw.phase==='pin'){ctx.font=`22px ${EMOJI_FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('📍',ptr.x,ptr.y-10)}
+  if(flashing(sw)&&sw.phase==='sew'){ctx.font=`bold 18px ${UI_FONT}`;ctx.fillStyle='#d0534a';ctx.textAlign='center';ctx.fillText(sw.flash,clamp(ptr.x,180,620),ptr.y-56)}
+  break}
+ case'stuff':{bgPlain();const st=S.stuff;drawDoll(now,{decor:false});
+  const op=openingPos();
+  if(!st.closed){ctx.fillStyle=shade(fab('body').color.hex,-.5);ell(ctx,op.x,op.y,30,7);ctx.fill();
+   const f=st.regs[0].fill;if(f>.1){const s=Math.min(1,f*1.5);ctx.fillStyle='#fffdf8';ctx.strokeStyle='#e2d8ca';ctx.lineWidth=1.2;for(const[dx,dy,r]of[[-10,4,9],[9,5,8],[0,9,11]]){circle(ctx,op.x+dx*s,op.y+dy*s,r*s);ctx.fill();ctx.stroke()}}}
+  if(st.closing){const cps=closePoints();ctx.strokeStyle=threadColor();ctx.lineWidth=2.5;ctx.beginPath();for(let i=0;i<st.closeIdx;i++){const c=cps[i];ctx.moveTo(c.x-4,c.y-7);ctx.lineTo(c.x+4,c.y+7)}ctx.stroke();
+   if(!st.closed){const c=cps[st.closeIdx];ctx.strokeStyle='#e07a5f';ctx.lineWidth=2.5;circle(ctx,c.x,c.y,8+Math.sin(now/120)*2);ctx.stroke()}}
+  if(st.leaked&&!st.closed&&!(S.sew.backStart&&S.sew.backEnd)){const p0=S.sew.path[0],p=toDoll(p0.x-CX,p0.y-CY);ctx.fillStyle='#fffdf8';ctx.strokeStyle='#e2d8ca';circle(ctx,p.x+6,p.y+4,7+Math.sin(now/200)*1.5);ctx.fill();ctx.stroke()}
+  ctx.fillStyle='#efe2cf';ell(ctx,BAG.x,BAG.y+8,52,40);ctx.fill();ctx.strokeStyle='#d6c2a6';ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle='#fffdf8';ctx.strokeStyle='#e2d8ca';for(const[dx,dy,r]of[[-22,-8,16],[0,-16,19],[22,-8,16],[-8,4,15],[12,4,15]]){circle(ctx,BAG.x+dx,BAG.y+dy,r);ctx.fill();ctx.stroke()}
+  ctx.font=`13px ${UI_FONT}`;ctx.fillStyle='#4a3b32';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('棉花袋（按住拉）',BAG.x,BAG.y+62);
+  if(st.clump){const c=st.clump,r=7+c.size*7;ctx.fillStyle='#fffdf8';ctx.strokeStyle='#d9cdbd';ctx.lineWidth=1.3;for(const[dx,dy,k]of[[-.5,0,.8],[.5,0,.8],[0,-.4,1],[0,.35,.85]]){circle(ctx,c.x+dx*r,c.y+dy*r,r*k);ctx.fill();ctx.stroke()}
+   ctx.font=`bold 13px ${UI_FONT}`;ctx.fillStyle='#8a5a3a';ctx.fillText(c.size<1?'小團':c.size<=1.4?'中小團':c.size<2.2?'大團':'超大團',c.x,c.y-r-14)}
+  st.parts.forEach(p=>{ctx.globalAlpha=clamp(p.l,0,1);ctx.fillStyle='#fff';ctx.strokeStyle='#e5dccf';ctx.lineWidth=1;circle(ctx,p.x,p.y,p.r);ctx.fill();ctx.stroke()});ctx.globalAlpha=1;
+  const regs=st.regs,px=632,py=60,ph=36+regs.length*40;
+  ctx.fillStyle='rgba(255,255,255,.92)';rrect(ctx,px,py,158,ph,12);ctx.fill();ctx.font=`bold 13px ${UI_FONT}`;ctx.fillStyle='#4a3b32';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText('各部位手感',px+12,py+18);
+  regs.forEach((r,i)=>{const y=py+40+i*40;ctx.font=`13px ${UI_FONT}`;ctx.fillStyle='#4a3b32';ctx.fillText(r.name,px+12,y);ctx.fillStyle='#9a8778';ctx.textAlign='right';ctx.fillText(softLabel(r.fill)+(r.lump>.3?'・凹凸':''),px+146,y);ctx.textAlign='left';
+   ctx.fillStyle='#efe6da';rrect(ctx,px+12,y+9,134,8,4);ctx.fill();ctx.fillStyle=r.fill>1.05?'#d0534a':r.fill<.3?'#e0a35f':'#6aa88a';rrect(ctx,px+12,y+9,Math.max(1,134*Math.min(1,r.fill/1.35)),8,4);ctx.fill()});
+  hint(st.closed?'開口縫好了！':st.closing?'點縫點縫合開口':'從棉花袋拉出棉花，拖到娃娃身上');
+  if(flashing(st)){ctx.font=`bold 16px ${UI_FONT}`;ctx.fillStyle='#d0534a';ctx.textAlign='center';ctx.fillText(st.flash,W/2,H-24)}
+  break}
+ case'decor':{bgPlain();drawDoll(now);hint('點下方配件加上去；拖曳移動、滾輪縮放');break}
+ case'deliver':{const r=S.result;const g=ctx.createRadialGradient(CX-90,CY-40,40,CX-90,CY,520);g.addColorStop(0,'#fff6ea');g.addColorStop(1,'#e9cfb5');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const b=bbox(dollAllPoints()).y1;ctx.save();ctx.translate(-90,0);
+  ctx.fillStyle='#c98b5e';ell(ctx,CX,b+18,150,26);ctx.fill();ctx.fillStyle='#d9a173';ell(ctx,CX,b+8,150,24);ctx.fill();
+  drawDoll(now,{sel:false});ctx.restore();
+  ctx.font=`72px ${EMOJI_FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(S.order.emoji,670,430);
+  bubble(510,170,270,r.line,17,'down');
+  ctx.font=`30px ${UI_FONT}`;ctx.textAlign='center';ctx.fillStyle='#e0a020';ctx.fillText('★'.repeat(r.stars)+'☆'.repeat(5-r.stars),645,130);
+  ctx.font=`bold 15px ${UI_FONT}`;ctx.fillStyle='#8a5a3a';ctx.textAlign='left';ctx.fillText(`給 ${S.order.who} 的娃娃`,24,32);
+  ctx.font=`13px ${UI_FONT}`;ctx.fillStyle='#9a8778';ctx.fillText(`${S.body.name}・${new Set(usedSlots().map(s=>fabKey(fab(s)))).size} 種布・${softLabel(overallSoft())}`,24,54);
+  S.confetti.forEach(p=>{ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.c;ctx.globalAlpha=clamp(p.l,0,1);ctx.fillRect(-4,-2.5,8,5);ctx.restore()});ctx.globalAlpha=1;
+  break}
+ }
+}
+
+function update(dt,now){
+ if(now-ptr.lastMove>60)ptr.speed*=.8;
+ if(S.step==='sew'&&S.sew.phase==='sew'){const sw=S.sew;
+  if(sw.backHold){const L=sw.path.length,zone=sw.idx>=2&&sw.idx<16?'start':sw.idx>L-16?'end':null;
+   if(!zone){if(!flashing(sw))flash(sw,sw.idx<2?'先車幾針，再回針':'回針要在開頭或結尾做');sw.backT=0}
+   else if((zone==='start'&&!sw.backStart)||(zone==='end'&&!sw.backEnd)){sw.backT+=dt;const n=Math.floor(sw.backT*8);if(n!==sw._bt){sw._bt=n;SFX.thunk()}
+    if(sw.backT>=.6){zone==='start'?sw.backStart=true:sw.backEnd=true;sw.backT=0;flash(sw,'回針完成 ✔');SFX.pop();renderControls()}}
+  }else sw.backT=0}
+ if(S.step==='stuff'){const st=S.stuff;
+  if(st.clump&&ptr.down&&dist(ptr,BAG)<60)st.clump.size=Math.min(3,st.clump.size+dt*1.5);
+  if(!st.closed&&!(S.sew.backStart&&S.sew.backEnd)&&st.regs[0].fill>.7){st.regs[0].fill-=dt*.05;st.leaked=true}
+  st.squish=Math.max(0,st.squish-dt*2.5);
+  st.parts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.l-=dt*2.5});st.parts=st.parts.filter(p=>p.l>0);
+  const cb=document.getElementById('closeBtn');if(cb)cb.disabled=st.regs[0].fill<.15;
+ }
+ if(S.step==='deliver'){S.confetti.forEach(p=>{p.vy+=.25;p.x+=p.vx;p.y+=p.vy;p.r+=.1;if(p.y>H-40)p.l-=dt*2});S.confetti=S.confetti.filter(p=>p.l>0)}
+ updateStatus();
+}
+let lastT=performance.now(),sideT=0;
+function loop(now){const dt=Math.min(.05,(now-lastT)/1000);lastT=now;update(dt,now);render(now);if(now-sideT>250){renderSide();sideT=now}requestAnimationFrame(loop)}
+startOrder();requestAnimationFrame(loop);
+</script>
+</body>
+</html>
