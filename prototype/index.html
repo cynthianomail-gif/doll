@@ -49,6 +49,13 @@ canvas{width:100%;height:auto;display:block;border-radius:12px;touch-action:none
 .sliders label span{width:78px;flex:none}
 .sliders input{flex:1;accent-color:var(--accent);min-width:0}
 .sliders .foot{grid-column:1/-1;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.txt{font:inherit;font-size:15px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:240px}
+body.stream header,body.stream aside,body.stream #controls{display:none}
+body.stream main{grid-template-columns:1fr;max-width:none;padding:0}
+body.stream .stage{border:none;border-radius:0;padding:0;background:transparent}
+body.stream canvas{border-radius:0;width:auto;max-width:100%;max-height:100vh;margin:0 auto}
+#streamBar{display:none;position:fixed;top:10px;right:10px;gap:6px;z-index:9}
+body.stream #streamBar{display:flex}
 .adj{background:#fbf3e9;border:1px dashed #e2cdb6;border-radius:10px;padding:6px 10px;margin:6px 0 10px;font-size:13px;color:var(--muted)}
 .adj .row{margin-top:4px}
 kbd{background:#fff;border:1px solid #d9c8b4;border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:12px;font-family:inherit}
@@ -75,7 +82,7 @@ aside{display:flex;flex-direction:column;gap:12px;min-width:0}
 </head>
 <body>
 <header>
-  <h1>🧸 娃娃工坊 <small style="font-size:12px;color:var(--muted);font-weight:normal">原型 v0.7</small></h1>
+  <h1>🧸 娃娃工坊 <small style="font-size:12px;color:var(--muted);font-weight:normal">原型 v0.8</small></h1>
   <div class="steps" id="steps"></div>
 </header>
 <main>
@@ -84,6 +91,7 @@ aside{display:flex;flex-direction:column;gap:12px;min-width:0}
     <div id="controls"></div>
   </section>
   <aside id="side"></aside>
+  <div id="streamBar"><button class="btn small" id="chromaBtn">綠幕：關</button><button class="btn small" id="exitStream">離開直播模式（Esc）</button></div>
 </main>
 <script>
 // ===================== 幾何小工具（資料會用到） =====================
@@ -294,7 +302,8 @@ function overlap(P,Q){const A=bbox(P),B=bbox(Q),x0=Math.max(A.x0,B.x0),x1=Math.m
 function rotV(x,y,a){const c=Math.cos(a),s=Math.sin(a);return{x:x*c-y*s,y:x*s+y*c}}
 
 // ===================== 畫布 =====================
-const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const cv=document.getElementById('cv');let ctx=cv.getContext('2d');
+function withCtx(g,fn){const k=ctx;ctx=g;try{return fn()}finally{ctx=k}}
 const W=800,H=560,dpr=Math.min(2,window.devicePixelRatio||1);
 cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
 const CX=400,CY=320,R=108,LS=.5,FAB={x:40,y:110,w:720,h:230},BAG={x:100,y:470};
@@ -382,7 +391,7 @@ const SFX={snip:()=>noise(.05,.35,4200),thunk:()=>tone(150,.06,'triangle',.22,.5
 
 // ===================== 狀態 =====================
 let S=null;
-const meta={coins:100,rep:0,done:0,queue:[],dolls:[],clothes:[],mannequins:{},closet:{model:null,flash:'',flashT:0}};
+const meta={coins:100,rep:0,done:0,queue:[],dolls:[],clothes:[],mannequins:{},closet:{model:null,flash:'',flashT:0},series:[],seriesSel:0,chroma:false};
 const ptr={x:-99,y:-99,down:false,inside:false,speed:0,lastT:0,lastMove:0};
 let lastSfx=0;
 const flash=(o,msg)=>{o.flash=msg;o.flashT=performance.now()};
@@ -683,7 +692,7 @@ function enterDeliver(){
  if(S.order.free){
   const comments=[],craft=craftScore(comments),c=cost();
   S.result={free:true,craft,cost:c,comments,stars:0};meta.coins-=c;
-  if(S.mode==='garment')meta.clothes.push(S.g);else{S.wear={};S.name=`娃娃 ${meta.dolls.length+1}`;meta.dolls.push(S)}
+  if(S.mode==='garment')meta.clothes.push(S.g);else{S.wear={};S.id=S.id||newId();S.name=`娃娃 ${meta.dolls.length+1}`;meta.dolls.push(S)}
   saveGame();
   SFX.ding();for(let i=0;i<60;i++)S.confetti.push({x:CX-90+(Math.random()-.5)*80,y:CY-40,vx:(Math.random()-.5)*9,vy:-Math.random()*9-3,c:['#f4b6c6','#f6d96b','#a9d3ee','#a6dcc0','#e07a5f'][i%5],r:Math.random()*Math.PI,l:1});
   return;
@@ -729,9 +738,9 @@ function drawMainFX(m){
 }
 function dollAllPoints(){let pts=[];mains().forEach(m=>pts=pts.concat(mOutline(m,1,90)));activeParts('front').forEach(k=>[-1,1].forEach(s=>pts=pts.concat(partPoly(k,s))));const hg=hairGeo();if(hg&&hg.back)pts=pts.concat(hg.back);return pts}
 function groundShadow(pts){const b=bbox(pts);ctx.fillStyle='rgba(60,40,30,.16)';ell(ctx,(b.x0+b.x1)/2,b.y1+6,(b.x1-b.x0)*.4,13);ctx.fill()}
-function drawDoll(now,{decor=true,sel=true,highlight=null}={}){
+function drawDoll(now,{decor=true,sel=true,highlight=null,shadow=true}={}){
  const fx=!!S.stuff.regs,bf=fab('body'),hg=hairGeo();
- groundShadow(dollAllPoints());ctx.save();
+ if(shadow)groundShadow(dollAllPoints());ctx.save();
  if(S.offGrain>=3&&bf.mat.id==='cotton'){ctx.translate(CX,CY);ctx.transform(1,0,-.06,1,0,0);ctx.translate(-CX,-CY)}
  if(hg){if(hg.back)drawHair(hg.back,hg.m);if(hg.tails)hg.tails.forEach(P=>drawHair(P,hg.m))}
  const wear=S.kind==='human'?(S.wear||{}):{},hardD=isHard();
@@ -961,7 +970,7 @@ function serGarment(g){return{id:g.id,type:g.type,cls:g.cls,fab:{mat:g.fab.mat.i
 function deGarment(o){return{...o,done:true,fab:{mat:MAT_BY[o.fab.mat],color:COLOR_BY[o.fab.color]},trims:o.trims||[]}}
 const ser2=f=>f?{mat:f.mat&&f.mat.id,color:f.color&&f.color.id}:null;
 function serDoll(d){
- return{name:d.name,kind:d.kind,body:d.body.id,head:d.head.id,hair:d.hair.id,parts:Object.fromEntries(Object.entries(d.parts).map(([k,o])=>[k,o.id])),adj:d.adj,shp:d.shp,
+ return{id:d.id,name:d.name,kind:d.kind,body:d.body.id,head:d.head.id,hair:d.hair.id,parts:Object.fromEntries(Object.entries(d.parts).map(([k,o])=>[k,o.id])),adj:d.adj,shp:d.shp,
   fab:Object.fromEntries(Object.entries(d.fab).map(([k,f])=>[k,ser2(f)])),decor:d.decor,regs:(d.stuff.regs||[]).map(r=>[r.fill,r.lump]),material:d.material||'cloth',tint:d.hard?d.hard.tint:0,paint:d.paint?{varnish:d.paint.varnish,strokes:d.paint.strokes.map(x=>({color:x.color,size:x.size,mode:x.mode,pts:x.pts.map(q=>[Math.round(q.x),Math.round(q.y)])}))}:null,stains:d.stains,offGrain:d.offGrain,
   sew:d.sew.list.map(x=>({mid:x.mid,cx:x.cx,cy:x.cy,backStart:x.backStart,backEnd:x.backEnd,stitches:x.stitches.filter(t=>!t.bad).map(t=>[Math.round(t.dx*10)/10,Math.round(t.dy*10)/10])})),
   wear:Object.fromEntries(Object.entries(d.wear||{}).map(([k,g])=>[k,g.id]))};
@@ -977,15 +986,15 @@ function deDoll(o,byId){
   d.decor=o.decor||[];d.stains=o.stains||[];d.offGrain=o.offGrain||0;d.material=o.material||'cloth';
   if(d.material!=='cloth'){d.hard={accs:{},tint:o.tint||0};if(o.paint)d.paint={varnish:o.paint.varnish,strokes:o.paint.strokes.map(x=>({...x,pts:x.pts.map(([a,b])=>({x:a,y:b}))}))}}
   d.sew.list=(o.sew||[]).map(x=>({...x,pins:[],path:[],done:true,stitches:x.stitches.map(([dx,dy])=>({dx,dy,q:1,bad:false}))}));
-  d.step='done';d.name=o.name;d.wear={};Object.entries(o.wear||{}).forEach(([k,id])=>{if(byId[id])d.wear[k]=byId[id]});
+  d.step='done';d.id=o.id||newId();d.name=o.name;d.wear={};Object.entries(o.wear||{}).forEach(([k,id])=>{if(byId[id])d.wear[k]=byId[id]});
  }finally{S=keep}
  return d;
 }
-function saveGame(){try{localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,coins:meta.coins,rep:meta.rep,done:meta.done,clothes:meta.clothes.map(serGarment),dolls:meta.dolls.map(serDoll)}))}catch(e){console.warn('存檔失敗',e)}}
+function saveGame(){try{localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,series:meta.series,chroma:meta.chroma,coins:meta.coins,rep:meta.rep,done:meta.done,clothes:meta.clothes.map(serGarment),dolls:meta.dolls.map(serDoll)}))}catch(e){console.warn('存檔失敗',e)}}
 function loadGame(){
  try{const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;const o=JSON.parse(raw);
   meta.coins=o.coins;meta.rep=o.rep;meta.done=o.done;meta.clothes=(o.clothes||[]).map(deGarment);
-  const byId=Object.fromEntries(meta.clothes.map(g=>[g.id,g]));meta.dolls=(o.dolls||[]).map(x=>deDoll(x,byId));
+  const byId=Object.fromEntries(meta.clothes.map(g=>[g.id,g]));meta.dolls=(o.dolls||[]).map(x=>deDoll(x,byId));meta.series=o.series||[];meta.chroma=!!o.chroma;
  }catch(e){console.warn('讀取存檔失敗',e)}
 }
 
@@ -1093,6 +1102,146 @@ function processSand(q,d){
  if(sd.sum/sd.count<.06){sd.done=true;S.hard.accs.sand=clamp(1-sd.sum/sd.count,0,1);SFX.ding();renderControls()}
 }
 
+
+// ===================== 盲盒系列與開箱 =====================
+const RAR={common:{name:'普通',w:1,color:'#fff1cf'},rare:{name:'稀有',w:.35,color:'#ffd54a'},secret:{name:'隱藏款',w:.08,color:'rainbow'}};
+const PATTERNS=[['none','素面'],['dots','圓點'],['stripes','斜紋'],['stars','星星'],['checker','格子']];
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const curSeries=()=>meta.series[meta.seriesSel]||null;
+const dollById=id=>meta.dolls.find(d=>d.id===id);
+function seriesOdds(se){const tot=se.dolls.reduce((a,e)=>a+RAR[e.rarity].w,0);return Object.fromEntries(se.dolls.map(e=>[e.id,tot?RAR[e.rarity].w/tot:0]))}
+const boxTiles={};
+function boxPattern(b){
+ const key=b.color+b.pattern+b.pcolor;if(boxTiles[key])return boxTiles[key];
+ const s=36,c=document.createElement('canvas');c.width=c.height=s;const g=c.getContext('2d');g.fillStyle=COLOR_BY[b.color].hex;g.fillRect(0,0,s,s);g.fillStyle=g.strokeStyle=b.pcolor;
+ if(b.pattern==='dots'){circle(g,9,9,4);g.fill();circle(g,27,27,4);g.fill()}
+ if(b.pattern==='stripes'){g.lineWidth=5;g.beginPath();for(let k=-s;k<s*2;k+=12){g.moveTo(k,0);g.lineTo(k+s,s)}g.stroke()}
+ if(b.pattern==='stars'){[[9,10],[27,27]].forEach(([x,y])=>{g.beginPath();for(let i=0;i<10;i++){const a=i/10*Math.PI*2-Math.PI/2,r=i%2?2.4:5.5;g.lineTo(x+Math.cos(a)*r,y+Math.sin(a)*r)}g.closePath();g.fill()})}
+ if(b.pattern==='checker'){g.globalAlpha=.55;g.fillRect(0,0,18,18);g.fillRect(18,18,18,18);g.globalAlpha=1}
+ return boxTiles[key]=ctx.createPattern(c,'repeat');
+}
+// 盒子：x,y 是正面左上角；lid 0~1 是盒蓋掀開的程度
+function drawBox(x,y,w,h,d,b,name,{lid=0,open=false,shake=0}={}){
+ const col=COLOR_BY[b.color].hex,dx=d*.6,dy=d*.5;ctx.save();ctx.translate(shake,0);
+ ctx.fillStyle='rgba(0,0,0,.18)';ell(ctx,x+w/2+dx/2,y+h+6,w*.62,14);ctx.fill();
+ ctx.fillStyle=shade(col,-.28);ctx.beginPath();ctx.moveTo(x+w,y);ctx.lineTo(x+w+dx,y-dy);ctx.lineTo(x+w+dx,y+h-dy);ctx.lineTo(x+w,y+h);ctx.closePath();ctx.fill();
+ ctx.fillStyle=boxPattern(b);ctx.fillRect(x,y,w,h);ctx.strokeStyle=shade(col,-.4);ctx.lineWidth=2;ctx.strokeRect(x,y,w,h);
+ ctx.fillStyle='rgba(255,255,255,.88)';rrect(ctx,x+12,y+16,w-24,34,8);ctx.fill();
+ ctx.fillStyle='#4a3b32';ctx.font=`bold ${Math.min(18,w/9)}px ${UI_FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(name,x+w/2,y+33);
+ ctx.fillStyle='rgba(255,255,255,.85)';circle(ctx,x+w/2,y+h*.58,Math.min(w,h)*.22);ctx.fill();ctx.fillStyle=shade(col,-.45);ctx.font=`bold ${Math.min(w,h)*.26}px ${UI_FONT}`;ctx.fillText('?',x+w/2,y+h*.6);
+ ctx.font=`bold 11px ${UI_FONT}`;ctx.fillStyle='rgba(255,255,255,.95)';ctx.fillText('BLIND BOX・盲盒',x+w/2,y+h-14);
+ if(open){ctx.fillStyle='#2a2226';ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+dx,y-dy);ctx.lineTo(x+w+dx,y-dy);ctx.lineTo(x+w,y);ctx.closePath();ctx.fill()}
+ if(lid<1.5){ctx.save();ctx.translate(x+w/2,y);ctx.rotate(-lid*.5);ctx.translate(-(x+w/2),-y-lid*90);
+  ctx.fillStyle=shade(col,.18);ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+dx,y-dy);ctx.lineTo(x+w+dx,y-dy);ctx.lineTo(x+w,y);ctx.closePath();ctx.fill();ctx.strokeStyle=shade(col,-.4);ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle=shade(col,-.08);ctx.fillRect(x,y,w,10);ctx.restore()}
+ ctx.restore();
+}
+function drawBag(x,y,w,h,tear,now,shake=0){
+ ctx.save();ctx.translate(shake,0);const g=ctx.createLinearGradient(x,y,x+w,y+h);g.addColorStop(0,'#cfd4db');g.addColorStop(.45,'#f8fafc');g.addColorStop(1,'#a9b0ba');
+ ctx.fillStyle=g;rrect(ctx,x,y,w,h,8);ctx.fill();ctx.strokeStyle='#8f97a2';ctx.lineWidth=1.5;ctx.stroke();
+ ctx.strokeStyle='#9aa1ab';ctx.lineWidth=1;ctx.beginPath();for(let i=0;i<=w;i+=6){ctx.moveTo(x+i,y+2);ctx.lineTo(x+i,y+14);ctx.moveTo(x+i,y+h-14);ctx.lineTo(x+i,y+h-2)}ctx.stroke();
+ const ty=y+30;ctx.setLineDash([5,4]);ctx.strokeStyle='#e07a5f';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x+w*tear,ty);ctx.lineTo(x+w,ty);ctx.stroke();ctx.setLineDash([]);
+ if(tear>0){ctx.strokeStyle='#4a3b32';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,ty);ctx.lineTo(x+w*tear,ty+Math.sin(now/40)*1.5);ctx.stroke()}
+ ctx.fillStyle='rgba(120,128,140,.55)';ctx.font=`bold 44px ${UI_FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('?',x+w/2,y+h/2+8);
+ ctx.restore();
+}
+let silCv=null;
+function drawDollAt(d,x,y,s,now,sil=false){
+ const b=bbox(withDoll(d,dollAllPoints)),cx=(b.x0+b.x1)/2,cy=(b.y0+b.y1)/2;
+ const go=()=>{ctx.save();ctx.translate(x,y);ctx.scale(s,s);ctx.translate(-cx,-cy);withDoll(d,()=>drawDoll(now,{sel:false,shadow:!sil}));ctx.restore()};
+ if(!sil){go();return}
+ silCv=silCv||mkCanvas();const g=silCv.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,W,H);withCtx(g,go);
+ g.globalCompositeOperation='source-in';g.fillStyle='#3b3342';g.fillRect(0,0,W,H);g.globalCompositeOperation='source-over';ctx.drawImage(silCv,0,0,W,H);
+ ctx.fillStyle='#fff';ctx.font=`bold ${Math.round(60*s/.3)}px ${UI_FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('?',x,y);
+}
+function drawRays(cx,cy,color,t,alpha=1){
+ for(let i=0;i<18;i++){const a=i/18*Math.PI*2+t*.4,c=color==='rainbow'?`hsla(${(i*20+t*160)%360},90%,65%,${.28*alpha})`:hexA(color,.22*alpha);
+  ctx.fillStyle=c;ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,520,a-.06,a+.06);ctx.closePath();ctx.fill()}
+ const g=ctx.createRadialGradient(cx,cy,10,cx,cy,170);g.addColorStop(0,`rgba(255,255,255,${.75*alpha})`);g.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=g;ctx.fillRect(cx-200,cy-200,400,400);
+}
+function seriesPanel(){
+ const se=curSeries(),back='<div class="row"><button class="btn main" data-act="leaveSeries">← 回到工作室</button></div>';
+ let h=`<div class="group"><h4>我的系列</h4><div class="chips">${meta.series.map((x,i)=>chip(i===meta.seriesSel,'ssel',i,`<b>${esc(x.name)}</b><small>${x.dolls.length} 款・開過 ${x.opened} 盒</small>`)).join('')}<button class="btn small" data-act="snew">＋ 新系列</button></div></div>`;
+ if(!se)return h+back;
+ const odds=seriesOdds(se);
+ h+=`<div class="group"><h4>系列名稱</h4><input id="sname" class="txt" maxlength="12" value="${esc(se.name)}"></div>`;
+ h+=`<div class="group"><h4>放進系列的娃娃（2–7 款，點一下放進／拿出）</h4>${meta.dolls.length?`<div class="chips">${meta.dolls.map(d=>{const e=se.dolls.find(x=>x.id===d.id);return chip(!!e,'sdoll',d.id,`<b>${esc(d.name)}</b><small>${e?RAR[e.rarity].name+'・'+pct(odds[d.id]):'沒放進系列'}</small>`)}).join('')}</div>`:'<div class="tips">還沒有娃娃。回工作室用「自由創作：做娃娃」做幾隻，就能放進系列。</div>'}</div>`;
+ if(se.dolls.length)h+=`<div class="group"><h4>稀有度（隱藏款只能有一款）</h4>${se.dolls.map(e=>{const d=dollById(e.id);return d?`<div class="row" style="margin-top:4px"><span style="width:80px;font-size:14px">${esc(d.name)}</span>${Object.entries(RAR).map(([k,r])=>`<button class="btn small ${e.rarity===k?'on':''}" data-act="srar" data-arg="${e.id}:${k}">${r.name}</button>`).join('')}<span class="tips">抽中機率 ${pct(odds[e.id])}・已開到 ${se.owned[e.id]||0} 隻</span></div>`:''}).join('')}</div>`;
+ h+=`<div class="group"><h4>盒子顏色</h4><div class="chips">${COLORS.map(c=>`<button class="chip ${se.box.color===c.id?'on':''}" data-act="sbox" data-arg="color:${c.id}" style="min-width:0;padding:5px 8px"><b><i class="sw" style="background:${c.hex}"></i>${c.name}</b></button>`).join('')}</div></div>
+ <div class="group"><h4>圖案</h4><div class="chips">${PATTERNS.map(([k,n])=>chip(se.box.pattern===k,'sbox','pattern:'+k,`<b>${n}</b>`)).join('')}</div></div>
+ <div class="group"><h4>圖案顏色</h4><div class="chips">${PAINTS.map(c=>`<button class="chip ${se.box.pcolor===c.hex?'on':''}" data-act="sbox" data-arg="pcolor:${c.hex}" style="min-width:0;padding:5px 8px"><b><i class="sw" style="background:${c.hex}"></i>${c.name}</b></button>`).join('')}</div></div>
+ <div class="row"><button class="btn main" data-act="openBox" ${se.dolls.length>=2&&meta.coins>=10?'':'disabled'}>🎁 開一盒（$10）</button><button class="btn" data-act="poster">🖼 存成系列海報</button><button class="btn" data-act="stream">📺 直播模式</button><button class="btn" data-act="leaveSeries">← 回到工作室</button></div>
+ ${se.dolls.length<2?'<div class="tips">至少要放 2 款娃娃才能開盒。</div>':meta.coins<10?'<div class="tips">錢不夠開盒，先接幾張訂單吧。</div>':''}`;
+ return h;
+}
+function unboxPanel(){const u=S.unbox;if(u.phase!=='card')return'';const se=u.series;
+ return`<div class="row"><button class="btn main" data-act="openBox" ${meta.coins>=10?'':'disabled'}>🎁 再開一盒（$10）</button><button class="btn" data-act="backSeries">← 回到系列</button><button class="btn" data-act="stream">📺 直播模式</button><button class="btn" data-act="save">存成圖片</button></div>
+ <div class="tips">收集進度：${se.dolls.filter(e=>se.owned[e.id]).length} / ${se.dolls.length} 款</div>`}
+function pickFromSeries(se){const odds=seriesOdds(se);let r=Math.random();for(const e of se.dolls){r-=odds[e.id];if(r<=0)return e}return se.dolls[se.dolls.length-1]}
+function openBox(){
+ const se=curSeries();if(!se||se.dolls.length<2)return;if(meta.coins<10){flash(meta.closet,'錢不夠開盒了');SFX.no();return}
+ meta.coins-=10;se.opened++;const e=pickFromSeries(se),d=dollById(e.id);
+ S.unbox={series:se,doll:d,rar:e.rarity,phase:'shake',t:0,tear:0,bagTear:0,confetti:[]};if(S.step!=='unbox'){S._prevU=S.step}S.step='unbox';cv.style.cursor='grab';
+ saveGame();renderSteps();renderControls();renderSide(true);SFX.pop();
+}
+function unboxUpdate(dt,now){
+ const u=S.unbox;u.t+=dt;
+ if(u.phase==='shake'&&u.t>.9){u.phase='lid';u.t=0}
+ if(u.phase==='lidfly'&&u.t>.5){u.phase='bagrise';u.t=0}
+ if(u.phase==='bagrise'&&u.t>.6){u.phase='bag';u.t=0}
+ if(u.phase==='suspense'){if(Math.floor(u.t*4)!==u._b){u._b=Math.floor(u.t*4);tone(90+u._b*12,.12,'triangle',.18)}
+  if(u.t>(u.rar==='secret'?1.8:u.rar==='rare'?1.1:.7)){u.phase='reveal';u.t=0;
+   if(u.rar==='secret'){[523,659,784,1047,1319].forEach((f,i)=>tone(f,.3,'sine',.14,0,i*.09))}else SFX.ding();
+   const cols=u.rar==='secret'?['#ff7b9c','#ffd54a','#7ed6a0','#7fb6ff','#c59bff']:u.rar==='rare'?['#ffd54a','#ffe9a8','#f6b84a']:['#f4b6c6','#f6d96b','#a9d3ee','#a6dcc0'];
+   for(let i=0;i<(u.rar==='secret'?160:90);i++)u.confetti.push({x:CX+(Math.random()-.5)*60,y:200,vx:(Math.random()-.5)*12,vy:-Math.random()*10-3,c:cols[i%cols.length],r:Math.random()*Math.PI,l:1})}}
+ if(u.phase==='reveal'&&u.t>1.8){u.phase='card';u.t=0;u.series.owned[u.doll.id]=(u.series.owned[u.doll.id]||0)+1;saveGame();renderControls()}
+ u.confetti.forEach(p=>{p.vy+=.22;p.x+=p.vx;p.y+=p.vy;p.r+=.12;if(p.y>H-30)p.l-=dt*2});u.confetti=u.confetti.filter(p=>p.l>0);
+}
+function unboxMove(p,prev){
+ const u=S.unbox;if(!ptr.down)return;
+ if(u.phase==='lid'){u.tear+=Math.max(0,prev.y-p.y)/160+Math.abs(p.x-prev.x)/900;if(performance.now()-lastSfx>90){noise(.06,.18,1500+u.tear*1500);lastSfx=performance.now()}
+  if(u.tear>=1){u.phase='lidfly';u.t=0;SFX.pop();noise(.2,.3,900)}}
+ if(u.phase==='bag'){u.bagTear+=Math.abs(p.x-prev.x)/260;if(performance.now()-lastSfx>70){noise(.05,.22,3800);lastSfx=performance.now()}
+  if(u.bagTear>=1){u.phase='suspense';u.t=0;noise(.25,.3,4200)}}
+}
+function renderUnbox(now){
+ const u=S.unbox,se=u.series,bx=CX-110,by=280,bw=220,bh=200,bd=70;
+ if(meta.chroma){ctx.fillStyle='#00b140';ctx.fillRect(0,0,W,H)}else{const g=ctx.createRadialGradient(CX,220,30,CX,260,560);g.addColorStop(0,u.phase==='suspense'&&u.rar==='secret'&&Math.floor(now/90)%2?'#4a3a58':'#3a2f40');g.addColorStop(1,'#141017');ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
+ const rc=RAR[u.rar].color,reveal=u.phase==='reveal'||u.phase==='card';
+ if(reveal)drawRays(CX,190,rc,now/1000,Math.min(1,u.t*2+(u.phase==='card'?1:0)));
+ const shake=u.phase==='shake'?Math.sin(u.t*50)*7*(1-u.t):u.phase==='lid'?Math.sin(now/30)*u.tear*3:0;
+ const lid=u.phase==='lid'?u.tear*.25:u.phase==='lidfly'?.25+u.t*3:2;
+ drawBox(bx,by,bw,bh,bd,se.box,se.name,{lid,open:u.phase!=='shake'&&u.phase!=='lid',shake});
+ if(['bagrise','bag','suspense'].includes(u.phase)){const k=u.phase==='bagrise'?Math.min(1,u.t/.6):1,ease=1-(1-k)**3,bh2=190,y=by+30-ease*200;
+  ctx.save();ctx.beginPath();ctx.rect(0,0,W,by+4);ctx.clip();drawBag(CX-75,y,150,bh2,u.bagTear,now,u.phase==='suspense'?Math.sin(now/25)*4:0);ctx.restore()}
+ if(reveal){const k=u.phase==='card'?1:Math.min(1,u.t/.8),e=1-(1-k)**3,bounce=k<1?0:Math.sin(Math.min(1,u.t)*Math.PI)*0;
+  drawDollAt(u.doll,CX,190+(1-e)*120,.62*(.4+.6*e)+bounce,now);
+  const r=RAR[u.rar];ctx.font=`bold ${u.rar==='secret'?30:24}px ${UI_FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=u.rar==='secret'?`hsl(${(now/6)%360},90%,70%)`:u.rar==='rare'?'#ffd54a':'#fff';
+  ctx.globalAlpha=e;ctx.fillText(u.rar==='secret'?'✨ 隱藏款！✨':u.rar==='rare'?'★ 稀有 ★':'普通款',CX,52);ctx.globalAlpha=1}
+ u.confetti.forEach(p=>{ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.c;ctx.globalAlpha=clamp(p.l,0,1);ctx.fillRect(-4,-2.5,8,5);ctx.restore()});ctx.globalAlpha=1;
+ if(u.phase==='card'){const x=CX+150,y=330,w=230,hh=130;ctx.fillStyle='rgba(255,250,243,.95)';rrect(ctx,x,y,w,hh,14);ctx.fill();
+  ctx.fillStyle='#4a3b32';ctx.font=`bold 20px ${UI_FONT}`;ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(u.doll.name,x+16,y+16);
+  ctx.font=`14px ${UI_FONT}`;ctx.fillStyle='#8a5a3a';ctx.fillText(`${RAR[u.rar].name}・${se.name}`,x+16,y+48);
+  const got=se.dolls.filter(e=>se.owned[e.id]).length;ctx.fillText(`收集 ${got} / ${se.dolls.length}${(se.owned[u.doll.id]||0)>1?'・重複了！':'・新的！'}`,x+16,y+72);
+  ctx.fillStyle='#9a8778';ctx.font=`12px ${UI_FONT}`;ctx.fillText(document.body.classList.contains('stream')?'點畫面再開一盒':'用下方按鈕再開一盒',x+16,y+100)}
+ const prompt={lid:'⬆ 按住盒蓋往上拖，撕開盒子',bag:'⬅➡ 按住左右拖，撕開鋁箔袋'}[u.phase];
+ if(prompt){ctx.font=`bold 17px ${UI_FONT}`;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(prompt,CX,H-28)}
+}
+function renderSeries(now){
+ if(meta.chroma){ctx.fillStyle='#00b140';ctx.fillRect(0,0,W,H)}else bgPlain();
+ const se=curSeries();if(!se){hint('🎁 按「＋ 新系列」建立第一個盲盒系列');return}
+ drawBox(60,210,180,210,55,se.box,se.name);
+ ctx.fillStyle='#4a3b32';ctx.font=`bold 22px ${UI_FONT}`;ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(se.name,40,40);
+ ctx.font=`13px ${UI_FONT}`;ctx.fillStyle='#9a8778';ctx.fillText(`盲盒系列・共 ${se.dolls.length} 款${se.dolls.some(e=>e.rarity==='secret')?'（含隱藏款）':''}・開過 ${se.opened} 盒`,40,72);
+ const odds=seriesOdds(se),L=se.dolls,cw=118,ch=200,ox=300,oy=40;
+ if(!L.length){ctx.font=`15px ${UI_FONT}`;ctx.fillStyle='#9a8778';ctx.textAlign='center';ctx.fillText('從下面選娃娃放進系列（2–7 款）',540,260)}
+ L.forEach((e,i)=>{const d=dollById(e.id);if(!d)return;const col=i%4,row=Math.floor(i/4),x=ox+col*cw+cw/2,y=oy+row*ch+82;
+  ctx.fillStyle=e.rarity==='secret'?'rgba(80,60,100,.12)':e.rarity==='rare'?'rgba(255,213,74,.18)':'rgba(255,255,255,.6)';rrect(ctx,x-cw/2+5,y-78,cw-10,ch-12,12);ctx.fill();
+  drawDollAt(d,x,y,.3,now,e.rarity==='secret');
+  ctx.font=`bold 13px ${UI_FONT}`;ctx.fillStyle='#4a3b32';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(e.rarity==='secret'?'???':d.name,x,y+70);
+  ctx.font=`12px ${UI_FONT}`;ctx.fillStyle=e.rarity==='rare'?'#c98a00':e.rarity==='secret'?'#7a5aa0':'#9a8778';ctx.fillText(`${RAR[e.rarity].name}・${pct(odds[e.id])}`,x,y+88)});
+}
+
 // ===================== 輸入 =====================
 function toLocal(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
 cv.addEventListener('pointerdown',e=>{
@@ -1104,6 +1253,7 @@ cv.addEventListener('pointerdown',e=>{
   if(i>=0&&right){ACT.rot();ptr.down=false;break}
   if(i>=0){const u=L.units[i];L.drag={i,dx:p.x-u.x,dy:p.y-u.y}}renderControls();break}
  case'cut':S.cut.trail.push(null);processCut(p);break;
+ case'unbox':if(S.unbox.phase==='card'&&document.body.classList.contains('stream'))openBox();break;
  case'trim':processTrim(p);break;
  case'saw':processSaw(p);break;
  case'carve':processCarve(p);break;
@@ -1122,6 +1272,7 @@ cv.addEventListener('pointermove',e=>{
  ptr.speed=ptr.speed*.55+(d/dt)*.45;ptr.lastT=now;ptr.lastMove=now;ptr.x=p.x;ptr.y=p.y;ptr.inside=true;
  if(!ptr.down)return;
  if(S.step==='material')movePartDrag(p);
+ if(S.step==='unbox')unboxMove(p,prev);
  if(['trim','saw','carve'].includes(S.step)){const steps=Math.max(1,Math.ceil(d/3));for(let i=1;i<=steps;i++){const q={x:prev.x+(p.x-prev.x)*i/steps,y:prev.y+(p.y-prev.y)*i/steps};S.step==='trim'?processTrim(q):S.step==='saw'?processSaw(q):processCarve(q)}}
  if(S.step==='sand')processSand(p,d);
  if(S.step==='paint'&&S.paint.strokes.length){const st=S.paint.strokes[S.paint.strokes.length-1],lp=st.pts[st.pts.length-1];if(dist(lp,p)>(st.mode==='spray'?3:2))st.pts.push({x:p.x,y:p.y})}
@@ -1156,7 +1307,7 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>{if(e.code==='KeyB'&&S.step==='sew')S.sew.backHold=false;if(e.code==='Space'&&S.step==='sew')e.preventDefault()});
 const ctrl=document.getElementById('controls');
 ctrl.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&!b.disabled){ensureAudio();ACT[b.dataset.act](b.dataset.arg);if(document.activeElement)document.activeElement.blur()}});
-ctrl.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.gp){S.g.p[t.dataset.gp]=+t.value;return}if(!t.dataset||!t.dataset.sl)return;const[g,k]=t.dataset.sl.split('.');S.shp[g][k]=+t.value;rebuildShapes();const c=document.getElementById('shapeClass');if(c)c.textContent=bodyClass();const hc=document.getElementById('headClass');if(hc)hc.textContent=headClassOf(S.shp)});
+ctrl.addEventListener('input',e=>{const t=e.target;if(t.id==='sname'){const se=curSeries();if(se){se.name=t.value||'未命名系列';saveGame()}return}if(t.dataset&&t.dataset.gp){S.g.p[t.dataset.gp]=+t.value;return}if(!t.dataset||!t.dataset.sl)return;const[g,k]=t.dataset.sl.split('.');S.shp[g][k]=+t.value;rebuildShapes();const c=document.getElementById('shapeClass');if(c)c.textContent=bodyClass();const hc=document.getElementById('headClass');if(hc)hc.textContent=headClassOf(S.shp)});
 ctrl.addEventListener('pointerdown',e=>{if(e.target.closest('[data-hold=back]')){ensureAudio();S.sew.backHold=true}});
 window.addEventListener('pointerup',()=>{if(S&&S.step==='sew')S.sew.backHold=false});
 
@@ -1170,6 +1321,17 @@ const ACT={
  gmat(id){S.g.fab.mat=MAT_BY[id];SFX.pop();renderControls()},
  gcolor(id){S.g.fab.color=COLOR_BY[id];SFX.pop();renderControls()},
  toGdecor(){setStep('gdecor')},
+ series(){if(!['series','unbox'].includes(S.step))S._prevS=S.step;S.step='series';cv.style.cursor='default';renderSteps();renderControls()},
+ leaveSeries(){if(S._prevS==='deliver')startOrder();else setStep('order')},
+ backSeries(){S.step='series';cv.style.cursor='default';renderSteps();renderControls()},
+ snew(){meta.series.push({id:newId(),name:`我的系列 ${meta.series.length+1}`,dolls:[],box:{color:'pink',pattern:'dots',pcolor:'#ffffff'},owned:{},opened:0});meta.seriesSel=meta.series.length-1;saveGame();SFX.pop();renderControls()},
+ ssel(i){meta.seriesSel=+i;renderControls()},
+ sdoll(id){const se=curSeries(),i=se.dolls.findIndex(x=>x.id===id);if(i>=0)se.dolls.splice(i,1);else{if(se.dolls.length>=7){flash(meta.closet,'一個系列最多 7 款');SFX.no();return}se.dolls.push({id,rarity:'common'})}saveGame();SFX.pop();renderControls()},
+ srar(arg){const se=curSeries(),[id,r]=arg.split(':');if(r==='secret')se.dolls.forEach(x=>{if(x.rarity==='secret')x.rarity='rare'});se.dolls.find(x=>x.id===id).rarity=r;saveGame();SFX.pop();renderControls()},
+ sbox(arg){const se=curSeries(),i=arg.indexOf(':');se.box[arg.slice(0,i)]=arg.slice(i+1);saveGame();renderControls()},
+ openBox(){openBox()},
+ poster(){render(performance.now());const a=document.createElement('a');a.download=`盲盒系列_${curSeries().name}.png`;a.href=cv.toDataURL('image/png');a.click()},
+ stream(){document.body.classList.toggle('stream');setTimeout(()=>window.scrollTo(0,0),0)},
  closet(){const C=meta.closet;if(!C.model)C.model=meta.dolls.find(d=>d.kind==='human')||mannequin('20cm 正常體');S._prev=S.step;S.step='closet';cv.style.cursor='default';renderSteps();renderControls()},
  leaveCloset(){if(S._prev==='deliver')startOrder();else setStep('order')},
  model(i){const list=closetModels();meta.closet.model=list[+i];SFX.pop();renderControls()},
@@ -1245,7 +1407,7 @@ function slotOfTab(){return S.tab==='head'?'body':S.tab}
 
 // ===================== 介面 =====================
 function renderSteps(){
- const el=document.getElementById('steps');if(S.step==='closet'){el.innerHTML='<span class="step on">🧺 衣櫃</span>';return}
+ const el=document.getElementById('steps');if(['closet','series','unbox'].includes(S.step)){el.innerHTML=`<span class="step on">${{closet:'🧺 衣櫃',series:'🎁 盲盒系列',unbox:'🎁 開箱'}[S.step]}</span>`;return}
  const ST=S.mode==='garment'?STEPS_G:S.material==='vinyl'?STEPS_V:S.material==='wood'?STEPS_W:STEPS_D,i=ST.findIndex(s=>s[0]===S.step);
  el.innerHTML=ST.map(([id,n],j)=>[id,S.order.free&&id==='deliver'?'完成':S.order.free&&id==='order'?'自由創作':n]).map(([id,n],j)=>`<span class="step ${j===i?'on':j<i?'done':''}">${j<i?'✓ ':''}${n}</span>`).join('');
 }
@@ -1307,7 +1469,7 @@ function renderControls(){
  let h='<div id="status"></div>';
  switch(S.step){
   case'order':h+=`<div class="row"><button class="btn main" data-act="accept">接下委託 →</button><button class="btn" data-act="skip">換一位客人</button></div>
-   <div class="row"><button class="btn" data-act="free" data-arg="doll">🧸 自由創作：做娃娃</button><button class="btn" data-act="free" data-arg="garment">👗 自由創作：做衣服</button><button class="btn" data-act="closet">🧺 衣櫃（娃娃 ${meta.dolls.length}・衣服 ${meta.clothes.length}）</button></div>`;break;
+   <div class="row"><button class="btn" data-act="free" data-arg="doll">🧸 自由創作：做娃娃</button><button class="btn" data-act="free" data-arg="garment">👗 自由創作：做衣服</button><button class="btn" data-act="closet">🧺 衣櫃（娃娃 ${meta.dolls.length}・衣服 ${meta.clothes.length}）</button><button class="btn" data-act="series">🎁 盲盒系列（${meta.series.length}）</button></div>`;break;
   case'material':h+=materialPanel();break;
   case'cast':{const c=S.cast;h+=c.phase==='pour'?`<div class="row"><button class="btn main" data-act="castNext" ${c.amount<.2?'disabled':''}>灌好了，送進烤箱 →</button></div>`
    :c.phase==='bake'?`<div class="row"><button class="btn main" data-act="bakeStop">出爐！</button></div>`
@@ -1326,6 +1488,8 @@ function renderControls(){
    <div class="row"><button class="btn main" data-act="toDecor">上色好了，去裝飾 →</button></div>`;break}
   case'gdesign':h+=gdesignPanel();break;
   case'closet':h+=closetPanel();break;
+  case'series':h+=seriesPanel();break;
+  case'unbox':h+=unboxPanel();break;
   case'gdecor':{const sel=S.sel>=0;
    h+=`<div class="group"><h4>點一下加到衣服上</h4><div class="chips">${GTRIMS.map(id=>{const d=DECOR_BY[id];return`<button class="chip" data-act="add" data-arg="${id}"><b>${d.name}</b><em>$${d.cost}</em></button>`}).join('')}</div></div>
    <div class="row"><span style="font-size:13px;color:var(--muted)">選取的裝飾：</span>
@@ -1354,7 +1518,7 @@ function renderControls(){
    if(r.free){h+=`<div style="font-size:15px">${S.mode==='garment'?'這件衣服收進衣櫃了，可以拿給同身形的娃娃穿。':'這隻娃娃收進展示櫃了，可以到衣櫃幫它換衣服。'}</div>
    <div class="bars">${bar('手工品質',r.craft)}</div><div style="font-size:14px">材料費 <b class="n">-$${r.cost}</b>（自由創作用自己的錢）</div>
    ${r.comments.length?`<ul class="comments">${r.comments.map(c=>`<li>${c}</li>`).join('')}</ul>`:''}
-   <div class="row"><button class="btn main" data-act="next">回到工作室 →</button><button class="btn" data-act="closet">🧺 去衣櫃</button><button class="btn" data-act="save">存成圖片</button></div>`;break}
+   <div class="row"><button class="btn main" data-act="next">回到工作室 →</button><button class="btn" data-act="closet">🧺 去衣櫃</button>${S.mode==='doll'?'<button class="btn" data-act="series">🎁 放進盲盒系列</button>':''}<button class="btn" data-act="save">存成圖片</button></div>`;break}
    h+=`<div style="font-size:14px;color:var(--muted)">交件後才知道：${S.order.who}在意的是——</div>
    <div class="review">${r.review.map(x=>`<span>${x.text} <b class="${x.ok?'y':'n'}">${x.ok?'✔':'✘'}</b></span>`).join('')}</div>
    <div class="bars">${bar('符合期待',r.tagS)}${bar(r.fitLabel?'合身':'柔軟度',r.softS)}${bar('手工品質',r.craft)}</div>
@@ -1370,6 +1534,8 @@ function updateStatus(){
   case'order':t=S.mode==='garment'?'有客人帶著自己的娃娃來訂做衣服。仔細讀客人說的話，也要看清楚娃娃的身形。':'有客人上門了。仔細讀客人說的話——你要自己判斷對方想要什麼樣的娃娃。';break;
   case'gdesign':t=S.g.cls?`選種類、尺寸、布料，用滑桿調整樣式。${GT_BY[S.g.type].cat==='acc'?'帽子看頭圍，其他配件是通用尺寸。':''}${S.order.free?'':'畫面上是客人的娃娃，尺寸不對的話，衣服會看起來太小或太大。'}`:'先選尺寸（身形）。';break;
   case'gdecor':t=`在衣服上加蕾絲、鈕扣、口袋等裝飾。拖曳移動、滾輪縮放。目前花費 $${cost()}${S.order.free?'':` ／ 預算 $${S.order.budget}`}`;break;
+  case'series':{const se=curSeries();t=se?`選 2–7 隻自己做的娃娃放進系列，設定稀有度和盒子。稀有度越高越難抽到。${flashing(meta.closet)?` <span class="warn">${meta.closet.flash}</span>`:''}`:'按「＋ 新系列」建立第一個盲盒系列。';break}
+  case'unbox':{const u=S.unbox;t={shake:'盒子在晃……',lid:'按住盒蓋往上拖，把盒子撕開！',lidfly:'',bagrise:'',bag:'按住在鋁箔袋上左右拖，沿著虛線撕開！',suspense:'……',reveal:'',card:''}[u.phase]||'';if(u.phase==='card')t=`抽到了：<b>${u.doll.name}</b>（${RAR[u.rar].name}）`;break}
   case'closet':{const C=meta.closet;t=`選一隻娃娃或人台，點衣服穿上。只有同身形的衣服穿得下。${flashing(C)?` <span class="warn">${C.flash}</span>`:''}`;break}
   case'material':t=designReady()?`點畫面上的部位可以切換；<b>耳朵、手、腳、肚子可以直接拖曳移動</b>。<span class="tip">（用到 ${new Set(usedSlots().map(s=>fabKey(fab(s)))).size} 種布）</span>`:`先選${slotName('body')}的布料和顏色，其他部位預設會跟著一樣。`;break;
   case'layout':{const L=S.layout,ch=L.check,b=L.bolts[L.cur],bi=ch.bInfo[L.cur],w=[];
@@ -1409,7 +1575,7 @@ function renderSide(force){
   ${o.free?`<li><span>合計 ／ 你的錢</span><span class="${c<=meta.coins?'':'n'}">$${c} ／ $${meta.coins}</span></li>`:`<li><span>合計 ／ 預算</span><span class="${c<=o.budget?'':'n'}">$${c} ／ $${o.budget}</span></li>`}
   <li><span>手工</span><span class="q">裁布 ${S.cut.accs.length?pct(S.cut.acc):'—'} ・ 車縫 ${sewAllDone()?pct(sewAcc()):'—'}</span></li></ul></div>
  <div class="card wallet"><span>💰 $${meta.coins}</span><span>⭐ 聲望 ${meta.rep}</span><span>🧸 ${meta.done} 件</span></div>
- <div class="card tips">這是玩法原型 v0.7：布偶、搪膠、木頭娃娃，衣服、帽子與配件。收藏會存在這個瀏覽器裡。<br>耳朵、手、腳、肚子可以拖曳移動。客人的需求要靠你自己解讀，交件後才會知道客人在意什麼。</div>`;
+ <div class="card tips">這是玩法原型 v0.8：布偶、搪膠、木頭娃娃，衣服與配件，盲盒系列與開箱。收藏會存在這個瀏覽器裡。<br>耳朵、手、腳、肚子可以拖曳移動。客人的需求要靠你自己解讀，交件後才會知道客人在意什麼。</div>`;
  if(force||h!==sideCache){document.getElementById('side').innerHTML=h;sideCache=h}
 }
 
@@ -1564,6 +1730,8 @@ function render(now){
  case'gdecor':{bgPlain();drawModelWithGarment(now);
   S.decor.forEach((it,i)=>{drawItem(it);if(i===S.sel){ctx.setLineDash([5,4]);ctx.strokeStyle='#e07a5f';ctx.lineWidth=2;circle(ctx,it.x,it.y,DECOR_BY[it.type].hit*it.s+4);ctx.stroke();ctx.setLineDash([])}});
   hint('點下方的裝飾加到衣服上；拖曳移動、滾輪縮放');break}
+ case'series':renderSeries(now);break;
+ case'unbox':renderUnbox(now);break;
  case'closet':{bgPlain();const m=meta.closet.model;withDoll(m,()=>drawDoll(now,{sel:false}));
   ctx.font=`bold 15px ${UI_FONT}`;ctx.fillStyle='#8a5a3a';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(m.name||'娃娃',24,24);
   ctx.font=`13px ${UI_FONT}`;ctx.fillStyle='#9a8778';ctx.fillText(m.kind==='human'?`身形：${bodyClassOf(m.shp)}・${headClassOf(m.shp)}`:'動物布偶',24,46);
@@ -1606,12 +1774,16 @@ function update(dt,now){
   c.drops.forEach(d=>{d.y+=d.vy;d.vy+=.4;d.l-=dt*1.5});c.drops=c.drops.filter(d=>d.l>0&&d.y<c.box.y1)}
  if(S.step==='saw')S.saw.dust.forEach(d=>{d.x+=d.vx;d.y+=d.vy;d.vy+=.15;d.l-=dt*1.2});
  if(S.step==='carve')S.carve.chips.forEach(d=>{d.x+=d.vx;d.y+=d.vy;d.vy+=.3;d.r+=.2;d.l-=dt*1.5});
+ if(S.step==='unbox')unboxUpdate(dt,now);
  if(S.step==='deliver'){S.confetti.forEach(p=>{p.vy+=.25;p.x+=p.vx;p.y+=p.vy;p.r+=.1;if(p.y>H-40)p.l-=dt*2});S.confetti=S.confetti.filter(p=>p.l>0)}
  updateStatus();
 }
 let lastT=performance.now(),sideT=0;
 function loop(now){const dt=Math.min(.05,(now-lastT)/1000);lastT=now;update(dt,now);render(now);if(now-sideT>250){renderSide();sideT=now}requestAnimationFrame(loop)}
-loadGame();startOrder();requestAnimationFrame(loop);
+document.getElementById('exitStream').onclick=()=>document.body.classList.remove('stream');
+document.getElementById('chromaBtn').onclick=e=>{meta.chroma=!meta.chroma;e.target.textContent=`綠幕：${meta.chroma?'開':'關'}`;saveGame()};
+window.addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('stream')});
+loadGame();document.getElementById('chromaBtn').textContent=`綠幕：${meta.chroma?'開':'關'}`;startOrder();requestAnimationFrame(loop);
 </script>
 </body>
 </html>
