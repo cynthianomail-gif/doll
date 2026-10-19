@@ -56,6 +56,11 @@ body.stream .stage{border:none;border-radius:0;padding:0;background:transparent}
 body.stream canvas{border-radius:0;width:auto;max-width:100%;max-height:100vh;margin:0 auto}
 #streamBar{display:none;position:fixed;top:10px;right:10px;gap:6px;z-index:9}
 body.stream #streamBar{display:flex}
+.modal{display:none;position:fixed;inset:0;background:rgba(40,30,25,.45);z-index:20;align-items:center;justify-content:center;padding:16px}
+.modal.on{display:flex}
+.modal .mbox{background:var(--panel);border-radius:16px;padding:16px 18px;max-width:600px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.modal h3{margin:0 0 6px;font-size:17px}
+.modal textarea{width:100%;box-sizing:border-box;font-family:Consolas,monospace;font-size:12px;line-height:1.4;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);resize:vertical}
 .adj{background:#fbf3e9;border:1px dashed #e2cdb6;border-radius:10px;padding:6px 10px;margin:6px 0 10px;font-size:13px;color:var(--muted)}
 .adj .row{margin-top:4px}
 kbd{background:#fff;border:1px solid #d9c8b4;border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:12px;font-family:inherit}
@@ -82,7 +87,7 @@ aside{display:flex;flex-direction:column;gap:12px;min-width:0}
 </head>
 <body>
 <header>
-  <h1>🧸 娃娃工坊 <small style="font-size:12px;color:var(--muted);font-weight:normal">原型 v0.8</small></h1>
+  <h1>🧸 娃娃工坊 <small style="font-size:12px;color:var(--muted);font-weight:normal">原型 v0.9</small></h1>
   <div class="steps" id="steps"></div>
 </header>
 <main>
@@ -91,6 +96,7 @@ aside{display:flex;flex-direction:column;gap:12px;min-width:0}
     <div id="controls"></div>
   </section>
   <aside id="side"></aside>
+  <div id="modal" class="modal"><div class="mbox"><h3 id="mTitle"></h3><div id="mText" class="tips"></div><textarea id="mCode" rows="7" spellcheck="false"></textarea><div id="mMsg" class="tips" style="min-height:20px;margin-top:4px"></div><div class="row" id="mBtns"></div></div></div>
   <div id="streamBar"><button class="btn small" id="chromaBtn">綠幕：關</button><button class="btn small" id="exitStream">離開直播模式（Esc）</button></div>
 </main>
 <script>
@@ -1161,7 +1167,7 @@ function drawRays(cx,cy,color,t,alpha=1){
 }
 function seriesPanel(){
  const se=curSeries(),back='<div class="row"><button class="btn main" data-act="leaveSeries">← 回到工作室</button></div>';
- let h=`<div class="group"><h4>我的系列</h4><div class="chips">${meta.series.map((x,i)=>chip(i===meta.seriesSel,'ssel',i,`<b>${esc(x.name)}</b><small>${x.dolls.length} 款・開過 ${x.opened} 盒</small>`)).join('')}<button class="btn small" data-act="snew">＋ 新系列</button></div></div>`;
+ let h=`<div class="group"><h4>我的系列</h4><div class="chips">${meta.series.map((x,i)=>chip(i===meta.seriesSel,'ssel',i,`<b>${esc(x.name)}</b><small>${x.shared?'朋友分享・':''}${x.dolls.length} 款・開過 ${x.opened} 盒</small>`)).join('')}<button class="btn small" data-act="snew">＋ 新系列</button></div></div>`;
  if(!se)return h+back;
  const odds=seriesOdds(se);
  h+=`<div class="group"><h4>系列名稱</h4><input id="sname" class="txt" maxlength="12" value="${esc(se.name)}"></div>`;
@@ -1170,7 +1176,7 @@ function seriesPanel(){
  h+=`<div class="group"><h4>盒子顏色</h4><div class="chips">${COLORS.map(c=>`<button class="chip ${se.box.color===c.id?'on':''}" data-act="sbox" data-arg="color:${c.id}" style="min-width:0;padding:5px 8px"><b><i class="sw" style="background:${c.hex}"></i>${c.name}</b></button>`).join('')}</div></div>
  <div class="group"><h4>圖案</h4><div class="chips">${PATTERNS.map(([k,n])=>chip(se.box.pattern===k,'sbox','pattern:'+k,`<b>${n}</b>`)).join('')}</div></div>
  <div class="group"><h4>圖案顏色</h4><div class="chips">${PAINTS.map(c=>`<button class="chip ${se.box.pcolor===c.hex?'on':''}" data-act="sbox" data-arg="pcolor:${c.hex}" style="min-width:0;padding:5px 8px"><b><i class="sw" style="background:${c.hex}"></i>${c.name}</b></button>`).join('')}</div></div>
- <div class="row"><button class="btn main" data-act="openBox" ${se.dolls.length>=2&&meta.coins>=10?'':'disabled'}>🎁 開一盒（$10）</button><button class="btn" data-act="poster">🖼 存成系列海報</button><button class="btn" data-act="stream">📺 直播模式</button><button class="btn" data-act="leaveSeries">← 回到工作室</button></div>
+ <div class="row"><button class="btn main" data-act="openBox" ${se.dolls.length>=2&&meta.coins>=10?'':'disabled'}>🎁 開一盒（$10）</button><button class="btn" data-act="poster">🖼 存成系列海報</button><button class="btn" data-act="shareSeries" ${se.dolls.length>=2?'':'disabled'}>🔗 分享代碼</button><button class="btn" data-act="importCode">📥 匯入代碼</button><button class="btn" data-act="stream">📺 直播模式</button><button class="btn" data-act="leaveSeries">← 回到工作室</button></div>
  ${se.dolls.length<2?'<div class="tips">至少要放 2 款娃娃才能開盒。</div>':meta.coins<10?'<div class="tips">錢不夠開盒，先接幾張訂單吧。</div>':''}`;
  return h;
 }
@@ -1242,6 +1248,101 @@ function renderSeries(now){
   ctx.font=`12px ${UI_FONT}`;ctx.fillStyle=e.rarity==='rare'?'#c98a00':e.rarity==='secret'?'#7a5aa0':'#9a8778';ctx.fillText(`${RAR[e.rarity].name}・${pct(odds[e.id])}`,x,y+88)});
 }
 
+
+// ===================== 分享代碼 =====================
+// 代碼＝JSON 壓縮後轉成網址安全的 base64。匯入的內容一律當成不可信的資料：檢查型別、限制數量、夾住數值範圍。
+function b64urlEnc(bytes){let t='';for(let i=0;i<bytes.length;i+=0x8000)t+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));return btoa(t).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+function b64urlDec(str){const b=atob(str.replace(/-/g,'+').replace(/_/g,'/'));const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+async function packCode(obj){
+ const json=JSON.stringify(obj);
+ if(window.CompressionStream){try{const buf=await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer();return'DOLL1Z.'+b64urlEnc(new Uint8Array(buf))}catch(e){}}
+ return'DOLL1J.'+b64urlEnc(new TextEncoder().encode(json));
+}
+async function inflateCapped(bytes,cap=2e6){
+ const rd=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader(),chunks=[];let n=0;
+ for(;;){const{done,value}=await rd.read();if(done)break;n+=value.length;if(n>cap){rd.cancel();throw new Error('代碼內容太大')}chunks.push(value)}
+ const out=new Uint8Array(n);let o=0;chunks.forEach(c=>{out.set(c,o);o+=c.length});return new TextDecoder().decode(out);
+}
+async function unpackCode(code){
+ code=String(code).trim().replace(/\s+/g,'');const m=code.match(/^DOLL1([ZJ])\.([A-Za-z0-9_-]+)$/);if(!m)throw new Error('這不是娃娃工坊的分享代碼');
+ if(m[2].length>600000)throw new Error('代碼太長了');let bytes;try{bytes=b64urlDec(m[2])}catch(e){throw new Error('代碼有缺漏，請確認有完整複製')}
+ let text;if(m[1]==='Z'){if(!window.DecompressionStream)throw new Error('這個瀏覽器不支援解壓縮，請換 Chrome 或 Edge');text=await inflateCapped(bytes)}else{if(bytes.length>2e6)throw new Error('代碼內容太大');text=new TextDecoder().decode(bytes)}
+ try{return JSON.parse(text)}catch(e){throw new Error('代碼內容壞掉了')}
+}
+const num=(v,a,b,d)=>{v=+v;return Number.isFinite(v)?clamp(v,a,b):d};
+const isHex=h=>typeof h==='string'&&/^#[0-9a-fA-F]{6}$/.test(h);
+const obj=o=>o&&typeof o==='object'&&!Array.isArray(o)?o:{};
+const arr=(a,max)=>Array.isArray(a)?a.slice(0,max):[];
+function cleanDoll(o){
+ o=obj(o);const out={id:String(o.id||''),name:String(o.name||'分享的娃娃').slice(0,12),kind:o.kind==='human'?'human':'animal',
+  body:String(o.body||''),head:String(o.head||''),hair:String(o.hair||''),material:['cloth','vinyl','wood'].includes(o.material)?o.material:'cloth',tint:num(o.tint,0,1,0)};
+ out.parts={};Object.keys(PARTS).forEach(k=>out.parts[k]=String(obj(o.parts)[k]||'none'));
+ const shp=SHP_DEFAULT(),os=obj(o.shp);Object.entries(SL).forEach(([g,list])=>list.forEach(([k,,a,b])=>{shp[g][k]=num(obj(os[g])[k],a,b,shp[g][k])}));out.shp=shp;
+ out.adj={};const oa=obj(o.adj);PART_KEYS.forEach(k=>{const A=obj(oa[k]);if(!oa[k])return;out.adj[k]={sym:!!A.sym};['-1','1'].forEach(sd=>{const q=obj(A[sd]);out.adj[k][sd]={a:num(q.a,0,180,45),inset:num(q.inset,-.3,.45,.1),tilt:num(q.tilt,-120,240,0),scale:num(q.scale,.5,1.8,1)}})});
+ if(oa.belly){const b=obj(oa.belly);out.adj.belly={dx:num(b.dx,-.5,.5,0),dy:num(b.dy,-.65,.45,0),scale:num(b.scale,.5,1.6,1)}}
+ out.fab={};Object.entries(obj(o.fab)).forEach(([k,f])=>{if(!(k in SLOT_NAME))return;f=obj(f);out.fab[k]={mat:MAT_BY[f.mat]?f.mat:undefined,color:COLOR_BY[f.color]?f.color:undefined}});
+ if(!out.fab.body||!out.fab.body.mat||!out.fab.body.color)out.fab.body={mat:out.material==='cloth'?'cotton':out.material,color:out.material==='wood'?'pine':'cream'};
+ out.decor=arr(o.decor,60).map(obj).filter(d=>DECOR_BY[d.type]).map(d=>({type:d.type,x:num(d.x,0,W,CX),y:num(d.y,0,H,CY),s:num(d.s,.4,2.6,1),rot:num(d.rot,-50,50,0)}));
+ out.regs=arr(o.regs,30).map(r=>Array.isArray(r)?[num(r[0],0,1.35,.7),num(r[1],0,1,0)]:[.7,0]);
+ out.stains=arr(o.stains,10).map(obj).map(t=>({mid:String(t.mid||''),dx:num(t.dx,-300,300,0),dy:num(t.dy,-300,300,0)}));
+ out.offGrain=num(o.offGrain,0,10,0);
+ const pa=obj(o.paint);if(o.paint)out.paint={varnish:!!pa.varnish,strokes:arr(pa.strokes,400).map(obj).filter(t=>isHex(t.color)).map(t=>({color:t.color,size:num(t.size,2,30,9),mode:t.mode==='spray'?'spray':'brush',pts:arr(t.pts,3000).filter(Array.isArray).map(q=>[num(q[0],0,W,0),num(q[1],0,H,0)])}))};
+ out.wear={};Object.entries(obj(o.wear)).forEach(([k,id])=>{if(['top','bottom','outer','hat','band','clip','bag'].includes(k))out.wear[k]=String(id)});
+ return out;
+}
+function cleanGarment(o){
+ o=obj(o);if(!GT_BY[o.type])return null;const T=GT_BY[o.type],f=obj(o.fab);
+ const okCls=T.sizeBy==='body'?CLASSES.some(c=>c[0]===o.cls):T.sizeBy==='head'?HCLASSES.some(c=>c[0]===o.cls):o.cls==='通用';
+ if(!okCls||!MAT_BY[f.mat]||!COLOR_BY[f.color])return null;
+ const pp={};T.params.forEach(([k,,a,b,d])=>pp[k]=num(obj(o.p)[k],a,b,d));
+ return{id:String(o.id||''),type:o.type,cls:o.cls,fab:{mat:f.mat,color:f.color},p:pp,name:String(o.name||T.name).slice(0,16),trims:arr(o.trims,30).map(obj).filter(t=>DECOR_BY[t.type]).map(t=>({type:t.type,dx:num(t.dx,-300,300,0),dy:num(t.dy,-300,300,0),s:num(t.s,.4,2.6,1),rot:num(t.rot,-50,50,0)}))};
+}
+function cleanBox(b){b=obj(b);return{color:COLORS.some(c=>c.id===b.color)?b.color:'pink',pattern:PATTERNS.some(x=>x[0]===b.pattern)?b.pattern:'dots',pcolor:isHex(b.pcolor)?b.pcolor:'#ffffff'}}
+function regenStitches(d){withDoll(d,()=>{d.sew.list=mains().slice().reverse().map(m=>{const sw=makeSeam(m);sw.stitches=sw.path.map(q=>({dx:q.x-m.cx,dy:q.y-m.cy,q:1,bad:false}));sw.backStart=sw.backEnd=sw.done=true;return sw})})}
+function liteDoll(d){const o=serDoll(d);delete o.sew;o.regs=o.regs.map(([f,l])=>[+f.toFixed(2),+l.toFixed(2)]);return o}
+function wornOf(dolls){const set=new Set();dolls.forEach(d=>Object.values(d.wear||{}).forEach(g=>set.add(g)));return[...set]}
+function payloadSeries(se){const dolls=se.dolls.map(e=>dollById(e.id)).filter(Boolean);return{v:1,kind:'series',series:{name:se.name,box:se.box,items:se.dolls.map(e=>({id:e.id,rarity:e.rarity}))},dolls:dolls.map(liteDoll),clothes:wornOf(dolls).map(serGarment)}}
+function payloadDoll(d){return{v:1,kind:'doll',dolls:[liteDoll(d)],clothes:wornOf([d]).map(serGarment)}}
+async function importCode(code){
+ const o=obj(await unpackCode(code));if(o.v!==1||!['series','doll'].includes(o.kind))throw new Error('不認得的代碼版本');
+ const gMap={},clothes=[];arr(o.clothes,40).map(cleanGarment).filter(Boolean).forEach(g=>{const nid=newId();gMap[g.id]=nid;g.id=nid;clothes.push(deGarment(g))});
+ const byId=Object.fromEntries(clothes.map(g=>[g.id,g])),idMap={},dolls=[];
+ arr(o.dolls,7).map(cleanDoll).forEach(c=>{const old=c.id;c.id=newId();Object.keys(c.wear).forEach(k=>{c.wear[k]=gMap[c.wear[k]]||''});
+  c.paint=c.paint?{varnish:c.paint.varnish,strokes:c.paint.strokes}:null;const d=deDoll(c,byId);if(d.material==='cloth')regenStitches(d);d.shared=true;idMap[old]=d.id;dolls.push(d)});
+ if(!dolls.length)throw new Error('代碼裡沒有娃娃');
+ let se=null;
+ if(o.kind==='series'){const sr=obj(o.series),items=arr(sr.items,7).map(obj).filter(e=>idMap[e.id]).map(e=>({id:idMap[e.id],rarity:RAR[e.rarity]?e.rarity:'common'}));
+  let seen=false;items.forEach(e=>{if(e.rarity==='secret'){if(seen)e.rarity='rare';seen=true}});
+  if(items.length<2)throw new Error('系列裡的娃娃不夠 2 款');
+  se={id:newId(),name:String(sr.name||'分享的系列').slice(0,12),dolls:items,box:cleanBox(sr.box),owned:{},opened:0,shared:true}}
+ // 全部檢查通過才寫進收藏，失敗時不留下半套資料
+ meta.clothes.push(...clothes);meta.dolls.push(...dolls);if(se){meta.series.push(se);meta.seriesSel=meta.series.length-1}
+ saveGame();return{se,dolls};
+}
+// ----- 對話框 -----
+function modal(title,text,code,btns,readOnly){
+ const M=document.getElementById('modal');document.getElementById('mTitle').textContent=title;document.getElementById('mText').innerHTML=text;
+ const ta=document.getElementById('mCode');ta.value=code||'';ta.readOnly=!!readOnly;document.getElementById('mMsg').textContent='';
+ const B=document.getElementById('mBtns');B.innerHTML='';btns.forEach(([label,fn,main])=>{const b=document.createElement('button');b.className='btn'+(main?' main':'');b.textContent=label;b.onclick=fn;B.appendChild(b)});
+ M.classList.add('on');setTimeout(()=>{readOnly?ta.select():ta.focus()},30);
+}
+const closeModal=()=>document.getElementById('modal').classList.remove('on');
+const mMsg=t=>document.getElementById('mMsg').textContent=t;
+async function showExport(payload,title,what){
+ const code=await packCode(payload);
+ modal(title,`把這串代碼傳給朋友，對方在「📥 匯入代碼」貼上，就能拿到${what}。代碼長度 ${code.length} 字。`,code,[
+  ['複製代碼',async()=>{try{await navigator.clipboard.writeText(code);mMsg('已複製！')}catch(e){const ta=document.getElementById('mCode');ta.select();try{document.execCommand('copy');mMsg('已複製！')}catch(e2){mMsg('請手動選取複製（Ctrl+C）')}}},true],
+  ['關閉',closeModal]],true);
+}
+function showImport(pre=''){
+ modal('📥 匯入分享代碼','貼上朋友給你的代碼。匯入後，娃娃和衣服會加進你的收藏；如果是系列，就可以直接開盒。',pre,[
+  ['匯入',async()=>{try{const r=await importCode(document.getElementById('mCode').value);closeModal();SFX.ding();
+   if(r.se){S._prevS=S.step==='series'?S._prevS:S.step;S.step='series';cv.style.cursor='default'}else{meta.closet.model=r.dolls[0];S._prev=S.step==='closet'?S._prev:S.step;S.step='closet';cv.style.cursor='default'}
+   flash(meta.closet,r.se?`匯入了系列「${r.se.name}」（${r.dolls.length} 款）`:`匯入了「${r.dolls[0].name}」`);renderSteps();renderControls();renderSide(true)}
+   catch(e){mMsg('匯入失敗：'+e.message);SFX.no()}},true],
+  ['取消',closeModal]],false);
+}
+
 // ===================== 輸入 =====================
 function toLocal(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
 cv.addEventListener('pointerdown',e=>{
@@ -1298,6 +1399,7 @@ cv.addEventListener('wheel',e=>{
 },{passive:false});
 cv.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('keydown',e=>{
+ if(e.target&&(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT'))return;
  if(S.step==='sew'&&SW().phase==='sew'){
   if(e.code==='Space'){e.preventDefault();if(!e.repeat)pullPin()}
   if(e.code==='KeyB'){e.preventDefault();S.sew.backHold=true}}
@@ -1330,6 +1432,9 @@ const ACT={
  srar(arg){const se=curSeries(),[id,r]=arg.split(':');if(r==='secret')se.dolls.forEach(x=>{if(x.rarity==='secret')x.rarity='rare'});se.dolls.find(x=>x.id===id).rarity=r;saveGame();SFX.pop();renderControls()},
  sbox(arg){const se=curSeries(),i=arg.indexOf(':');se.box[arg.slice(0,i)]=arg.slice(i+1);saveGame();renderControls()},
  openBox(){openBox()},
+ shareSeries(){const se=curSeries();if(!se||se.dolls.length<2)return;showExport(payloadSeries(se),`🔗 分享系列「${se.name}」`,'這個系列（可以直接開盒）')},
+ shareDoll(){const d=meta.closet.model;if(!d||!meta.dolls.includes(d))return;showExport(payloadDoll(d),`🔗 分享「${d.name}」`,'這隻娃娃（和它身上的衣服）')},
+ importCode(){showImport()},
  poster(){render(performance.now());const a=document.createElement('a');a.download=`盲盒系列_${curSeries().name}.png`;a.href=cv.toDataURL('image/png');a.click()},
  stream(){document.body.classList.toggle('stream');setTimeout(()=>window.scrollTo(0,0),0)},
  closet(){const C=meta.closet;if(!C.model)C.model=meta.dolls.find(d=>d.kind==='human')||mannequin('20cm 正常體');S._prev=S.step;S.step='closet';cv.style.cursor='default';renderSteps();renderControls()},
@@ -1459,17 +1564,17 @@ function gdesignPanel(){
 }
 function closetPanel(){
  const C=meta.closet,ms=closetModels(),m=C.model;
- let h=`<div class="group"><h4>穿衣服的娃娃（人台＝空白的身形模特兒）</h4><div class="chips">${ms.map((d,i)=>chip(d===m,'model',i,`<b>${d.name||'娃娃'}</b><small>${d.kind==='human'?bodyClassOf(d.shp)+'・'+headClassOf(d.shp):'動物布偶'}</small>`)).join('')}</div></div>`;
+ let h=`<div class="group"><h4>穿衣服的娃娃（人台＝空白的身形模特兒）</h4><div class="chips">${ms.map((d,i)=>chip(d===m,'model',i,`<b>${esc(d.name||'娃娃')}${d.shared?' 🔗':''}</b><small>${d.kind==='human'?bodyClassOf(d.shp)+'・'+headClassOf(d.shp):'動物布偶'}</small>`)).join('')}</div></div>`;
  h+=`<div class="group"><h4>衣櫃（${meta.clothes.length} 件）——點一下穿上／脫下</h4>${meta.clothes.length?`<div class="chips">${meta.clothes.map((g,i)=>{const on=m.wear&&m.wear[GT_BY[g.type].slot]===g,fit=m.kind==='human'&&fitClassOf(g,m)===g.cls;
   return chip(on,'wear',i,`<b><i class="sw" style="background:${g.fab.color.hex}"></i>${g.name}${on?' ✔':''}</b><small>${g.cls}${fit?'':'・<span class="n">尺寸不合</span>'}</small>`)}).join('')}</div>`:'<div class="tips">還沒有衣服。回到工作室，用「自由創作：做衣服」做幾件吧。</div>'}</div>
- <div class="row"><button class="btn main" data-act="leaveCloset">← 回到工作室</button><span class="tips">收藏會自動存在這個瀏覽器裡。</span><button class="btn small" data-act="resetSave">清除存檔</button></div>`;
+ <div class="row"><button class="btn main" data-act="leaveCloset">← 回到工作室</button>${meta.dolls.includes(m)?'<button class="btn" data-act="shareDoll">🔗 分享這隻娃娃</button>':''}<button class="btn" data-act="importCode">📥 匯入代碼</button><span class="tips">收藏會自動存在這個瀏覽器裡。</span><button class="btn small" data-act="resetSave">清除存檔</button></div>`;
  return h;
 }
 function renderControls(){
  let h='<div id="status"></div>';
  switch(S.step){
   case'order':h+=`<div class="row"><button class="btn main" data-act="accept">接下委託 →</button><button class="btn" data-act="skip">換一位客人</button></div>
-   <div class="row"><button class="btn" data-act="free" data-arg="doll">🧸 自由創作：做娃娃</button><button class="btn" data-act="free" data-arg="garment">👗 自由創作：做衣服</button><button class="btn" data-act="closet">🧺 衣櫃（娃娃 ${meta.dolls.length}・衣服 ${meta.clothes.length}）</button><button class="btn" data-act="series">🎁 盲盒系列（${meta.series.length}）</button></div>`;break;
+   <div class="row"><button class="btn" data-act="free" data-arg="doll">🧸 自由創作：做娃娃</button><button class="btn" data-act="free" data-arg="garment">👗 自由創作：做衣服</button><button class="btn" data-act="closet">🧺 衣櫃（娃娃 ${meta.dolls.length}・衣服 ${meta.clothes.length}）</button><button class="btn" data-act="series">🎁 盲盒系列（${meta.series.length}）</button><button class="btn" data-act="importCode">📥 匯入代碼</button></div>`;break;
   case'material':h+=materialPanel();break;
   case'cast':{const c=S.cast;h+=c.phase==='pour'?`<div class="row"><button class="btn main" data-act="castNext" ${c.amount<.2?'disabled':''}>灌好了，送進烤箱 →</button></div>`
    :c.phase==='bake'?`<div class="row"><button class="btn main" data-act="bakeStop">出爐！</button></div>`
@@ -1575,7 +1680,7 @@ function renderSide(force){
   ${o.free?`<li><span>合計 ／ 你的錢</span><span class="${c<=meta.coins?'':'n'}">$${c} ／ $${meta.coins}</span></li>`:`<li><span>合計 ／ 預算</span><span class="${c<=o.budget?'':'n'}">$${c} ／ $${o.budget}</span></li>`}
   <li><span>手工</span><span class="q">裁布 ${S.cut.accs.length?pct(S.cut.acc):'—'} ・ 車縫 ${sewAllDone()?pct(sewAcc()):'—'}</span></li></ul></div>
  <div class="card wallet"><span>💰 $${meta.coins}</span><span>⭐ 聲望 ${meta.rep}</span><span>🧸 ${meta.done} 件</span></div>
- <div class="card tips">這是玩法原型 v0.8：布偶、搪膠、木頭娃娃，衣服與配件，盲盒系列與開箱。收藏會存在這個瀏覽器裡。<br>耳朵、手、腳、肚子可以拖曳移動。客人的需求要靠你自己解讀，交件後才會知道客人在意什麼。</div>`;
+ <div class="card tips">這是玩法原型 v0.9：布偶、搪膠、木頭娃娃，衣服與配件，盲盒系列與開箱。收藏會存在這個瀏覽器裡。<br>耳朵、手、腳、肚子可以拖曳移動。客人的需求要靠你自己解讀，交件後才會知道客人在意什麼。</div>`;
  if(force||h!==sideCache){document.getElementById('side').innerHTML=h;sideCache=h}
 }
 
@@ -1783,7 +1888,8 @@ function loop(now){const dt=Math.min(.05,(now-lastT)/1000);lastT=now;update(dt,n
 document.getElementById('exitStream').onclick=()=>document.body.classList.remove('stream');
 document.getElementById('chromaBtn').onclick=e=>{meta.chroma=!meta.chroma;e.target.textContent=`綠幕：${meta.chroma?'開':'關'}`;saveGame()};
 window.addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('stream')});
-loadGame();document.getElementById('chromaBtn').textContent=`綠幕：${meta.chroma?'開':'關'}`;startOrder();requestAnimationFrame(loop);
+document.getElementById('modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
+loadGame();if(location.hash.startsWith('#share='))setTimeout(()=>showImport(decodeURIComponent(location.hash.slice(7))),300);document.getElementById('chromaBtn').textContent=`綠幕：${meta.chroma?'開':'關'}`;startOrder();requestAnimationFrame(loop);
 </script>
 </body>
 </html>
