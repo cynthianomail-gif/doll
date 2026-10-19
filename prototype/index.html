@@ -44,6 +44,11 @@ canvas{width:100%;height:auto;display:block;border-radius:12px;touch-action:none
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn.small{padding:6px 11px;font-size:13px}
 .btn.on{outline:2px solid var(--accent)}
+.sliders{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 18px;background:#fbf3e9;border:1px dashed #e2cdb6;border-radius:10px;padding:8px 12px;margin:6px 0 10px}
+.sliders label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink)}
+.sliders label span{width:78px;flex:none}
+.sliders input{flex:1;accent-color:var(--accent);min-width:0}
+.sliders .foot{grid-column:1/-1;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 .adj{background:#fbf3e9;border:1px dashed #e2cdb6;border-radius:10px;padding:6px 10px;margin:6px 0 10px;font-size:13px;color:var(--muted)}
 .adj .row{margin-top:4px}
 kbd{background:#fff;border:1px solid #d9c8b4;border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:12px;font-family:inherit}
@@ -107,7 +112,7 @@ const HEADS=[
  {id:'squircle',name:'方圓頭',tags:['好笑'],ax:1,ay:.9,p:3.2,bumps:[]},
 ];
 // 身形（素體版型）：同一身形的衣服可以互穿（v0.5 起）
-const TEMPLATES={n20:{id:'n20',name:'20cm 正常體',sh:{ax:.62,ay:.6,bumps:[[-90,.18,.22],[12,.62,.2,0,'右手'],[168,.62,.2,0,'左手'],[68,.66,.13,0,'右腳'],[112,.66,.13,0,'左腳']]}}};
+// 人形素體的形狀由比例滑桿產生（rebuildShapes）；身形 = 尺寸 × 體型，由滑桿數值自動判定（bodyClass）
 const HAIRS=[
  {id:'none',name:'不要'},
  {id:'bob',name:'短髮',tags:['溫柔'],side:35,bang:-.12,bs:'curve',back:null,fluff:0},
@@ -239,7 +244,7 @@ function rotV(x,y,a){const c=Math.cos(a),s=Math.sin(a);return{x:x*c-y*s,y:x*s+y*
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const W=800,H=560,dpr=Math.min(2,window.devicePixelRatio||1);
 cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
-const CX=400,CY=320,R=108,LS=.5,FAB={x:40,y:110,w:720,h:230},BAG={x:100,y:470},HY=232,BY=342;
+const CX=400,CY=320,R=108,LS=.5,FAB={x:40,y:110,w:720,h:230},BAG={x:100,y:470};
 const EMOJI_FONT='"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
 const UI_FONT='"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
 
@@ -336,8 +341,8 @@ function startOrder(){
   cut:{order:[],which:0,pts:null,cov:null,devSum:0,devN:0,off:0,trail:[],done:false,accs:[],acc:0,doneAt:0,flaws:[],z:1},
   sew:{list:[],cur:0,assist:false,flash:'',flashT:0,backHold:false,backT:0},
   stuff:{regs:null,clump:null,closing:false,closeIdx:0,closed:false,parts:[],leaked:false,flash:'',flashT:0,squish:0,kneadAt:null},
-  decor:[],sel:-1,drag:null,result:null,confetti:[]};
- setStep('order');
+  decor:[],sel:-1,drag:null,result:null,confetti:[],shp:SHP_DEFAULT(),der:null};
+ rebuildShapes();setStep('order');
 }
 function setStep(step){
  S.step=step;
@@ -353,9 +358,29 @@ function setStep(step){
 
 // ===================== 娃娃結構：主體（要車縫、塞棉花的大塊） =====================
 function mains(){
- if(S.kind==='human')return[{id:'torso',name:'身體',sh:TEMPLATES.n20.sh,cx:CX,cy:BY,r:R*.62,gap:-90},{id:'head',name:'頭',sh:S.head,cx:CX,cy:HY,r:R*.8,gap:90}];
- return[{id:'body',name:'身體',sh:S.body,cx:CX,cy:CY,r:R,gap:90}];
+ const d=S.der;
+ if(S.kind==='human')return[{id:'torso',name:'身體',sh:d.torso,cx:CX,cy:d.BY,r:R*.62,gap:-90},{id:'head',name:'頭',sh:d.head,cx:CX,cy:d.HY,r:d.rH,gap:90}];
+ return[{id:'body',name:'身體',sh:d.body,cx:CX,cy:CY,r:R,gap:90}];
 }
+// ----- 比例滑桿 -----
+const SHP_DEFAULT=()=>({body:{w:1,h:1,sq:0,pear:0},head:{size:1,w:1,h:1,sq:0},torso:{w:1,h:1,armL:.62,armW:.2,armA:12,legL:.66,legW:.13,legSp:22}});
+const SL={
+ body:[['w','寬度',.7,1.5,.01],['h','高度',.7,1.4,.01],['sq','方圓',0,1,.01],['pear','上寬 ↔ 下寬',-1,1,.01]],
+ head:[['size','頭的大小',.75,1.25,.01],['w','寬度',.75,1.35,.01],['h','高度',.8,1.3,.01],['sq','方圓',0,1,.01]],
+ torso:[['w','胖瘦',.75,1.6,.01],['h','身高',.75,1.4,.01],['armL','手長',.3,1.1,.01],['armW','手粗',.12,.32,.005],['armA','手的角度',-10,45,1],['legL','腿長',.3,1.2,.01],['legW','腿粗',.08,.22,.005],['legSp','腿距',10,38,1]],
+};
+function rebuildShapes(){
+ const s=S.shp,b=S.body,h=S.head,t=s.torso,d=S.der||(S.der={});
+ const pb=b.bumps.slice();if(Math.abs(s.body.pear)>.02){const up=s.body.pear<0,a=Math.abs(s.body.pear)*.28;pb.push([up?-40:40,a,.5],[up?-140:140,a,.5])}
+ d.body={ax:b.ax*s.body.w,ay:b.ay*s.body.h,p:Math.min(5,(b.p||2)+s.body.sq*3),bumps:pb};
+ d.head={ax:h.ax*s.head.w,ay:h.ay*s.head.h,p:Math.min(5,(h.p||2)+s.head.sq*2.5),bumps:[]};
+ d.torso={ax:.62*t.w,ay:.6*t.h,bumps:[[-90,.18,.22],[t.armA,t.armL,t.armW,0,'右手'],[180-t.armA,t.armL,t.armW,0,'左手'],[90-t.legSp,t.legL,t.legW,0,'右腳'],[90+t.legSp,t.legL,t.legW,0,'左腳']]};
+ d.rH=R*.8*s.head.size;
+ const rT=R*.62;let HY0=232,hb=HY0+d.rH*shapeR(d.head,Math.PI/2),BY0=hb+rT*shapeR(d.torso,-Math.PI/2)-14;
+ let bottom=-1e9;for(let i=0;i<72;i++){const a=i/72*2*Math.PI;bottom=Math.max(bottom,BY0+Math.sin(a)*rT*shapeR(d.torso,a))}
+ const shift=Math.max(0,bottom-475);d.HY=HY0-shift;d.BY=BY0-shift;
+}
+function bodyClass(){const t=S.shp.torso;return`${t.h<.9?'15cm':t.h<=1.15?'20cm':'25cm'} ${t.w<=1.15?'正常體':'胖胖體'}`}
 function getMain(id){return mains().find(m=>m.id===id)}
 const hostOf=key=>S.kind==='human'?'head':'body';
 const previewFill=()=>S.step==='material'?.55:0;
@@ -420,6 +445,9 @@ function tally(){
  const t=Object.fromEntries(TAGS.map(x=>[x,0]));const add=(a,w=1)=>a.forEach(x=>t[x]+=w);
  if(S.kind==='human'){add(S.head.tags);if(S.hair.tags)add(S.hair.tags)}else add(S.body.tags);
  Object.values(S.parts).forEach(o=>o.tags&&add(o.tags));
+ const s=S.shp;
+ if(S.kind==='human'){if(s.head.size>1.1)add(['可愛']);if(s.torso.w>1.3)add(['療癒']);if(s.torso.legL>1)add(['好笑']);if(s.torso.h>1.2&&s.head.size<.9)add(['高級'])}
+ else{if(s.body.w>1.25)add(['療癒']);if(s.body.h>1.25)add(['好笑']);if(s.body.sq>.6)add(['酷'])}
  if(designReady()){const fabs=usedSlots().map(fab),bc=fab('body').color.id;
   new Set(fabs.map(f=>f.mat.id)).forEach(id=>add(MAT_BY[id].tags));
   add(COLOR_BY[bc].tags);const oc=new Set(fabs.map(f=>f.color.id));oc.delete(bc);oc.forEach(id=>add(COLOR_BY[id].tags,.5));
@@ -767,6 +795,7 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>{if(e.code==='KeyB'&&S.step==='sew')S.sew.backHold=false;if(e.code==='Space'&&S.step==='sew')e.preventDefault()});
 const ctrl=document.getElementById('controls');
 ctrl.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&!b.disabled){ensureAudio();ACT[b.dataset.act](b.dataset.arg);if(document.activeElement)document.activeElement.blur()}});
+ctrl.addEventListener('input',e=>{const t=e.target;if(!t.dataset||!t.dataset.sl)return;const[g,k]=t.dataset.sl.split('.');S.shp[g][k]=+t.value;rebuildShapes();const c=document.getElementById('shapeClass');if(c)c.textContent=bodyClass()});
 ctrl.addEventListener('pointerdown',e=>{if(e.target.closest('[data-hold=back]')){ensureAudio();S.sew.backHold=true}});
 window.addEventListener('pointerup',()=>{if(S&&S.step==='sew')S.sew.backHold=false});
 
@@ -775,12 +804,13 @@ const ACT={
  accept(){setStep('material')},
  skip(){startOrder()},
  kind(k){if(S.kind===k)return;S.kind=k;PART_KEYS.concat('belly').forEach(p=>{S.parts[p]=NONE(p);S.adj[p]=null});S.tab=k==='human'?'head':'body';
-  if(k==='human'&&!S.fab.body.color)S.fab.body.color=COLOR_BY.skin;SFX.pop();renderControls();renderSide(true)},
+  if(k==='human'&&!S.fab.body.color)S.fab.body.color=COLOR_BY.skin;rebuildShapes();SFX.pop();renderControls();renderSide(true)},
+ resetShape(g){S.shp[g]=SHP_DEFAULT()[g];rebuildShapes();SFX.pop();renderControls()},
  tab(slot){S.tab=slot;renderControls()},
  shape(id){const t=S.tab;
   if(t==='body')S.body=BODIES.find(b=>b.id===id);else if(t==='head')S.head=HEADS.find(b=>b.id===id);else if(t==='hair')S.hair=HAIRS.find(b=>b.id===id);
   else{S.parts[t]=PARTS[t].opts.find(o=>o.id===id);resetAdj(t)}
-  SFX.pop();renderControls()},
+  rebuildShapes();SFX.pop();renderControls()},
  mat(id){const s=slotOfTab();if(s==='body')S.fab.body.mat=MAT_BY[id];else S.fab[s]={...(S.fab[s]||{}),mat:MAT_BY[id]};SFX.pop();renderControls();renderSide(true)},
  color(id){const s=slotOfTab();if(s==='body')S.fab.body.color=COLOR_BY[id];else S.fab[s]={...(S.fab[s]||{}),color:COLOR_BY[id]};SFX.pop();renderControls()},
  same(){const s=slotOfTab();if(s!=='body'){S.fab[s]=null;SFX.pop();renderControls()}},
@@ -826,6 +856,7 @@ function renderSteps(){
  document.getElementById('steps').innerHTML=STEPS.map(([id,n],j)=>`<span class="step ${j===i?'on':j<i?'done':''}">${j<i?'✓ ':''}${n}</span>`).join('');
 }
 const chip=(on,act,arg,inner)=>`<button class="chip ${on?'on':''}" data-act="${act}" data-arg="${arg}">${inner}</button>`;
+function sliders(g,foot=''){return`<div class="sliders">${SL[g].map(([k,n,a,b,st])=>`<label><span>${n}</span><input type="range" min="${a}" max="${b}" step="${st}" value="${S.shp[g][k]}" data-sl="${g}.${k}"></label>`).join('')}<div class="foot">${foot}<button class="btn small" data-act="resetShape" data-arg="${g}">重設比例</button></div></div>`}
 function adjPanel(t){
  if(t==='belly'){if(S.parts.belly.id==='none')return'';return`<div class="adj">位置：直接在畫面上拖曳肚子。<div class="row"><button class="btn small" data-act="adj" data-arg="-">縮小</button><button class="btn small" data-act="adj" data-arg="+">放大</button><button class="btn small" data-act="adj" data-arg="reset">重設</button></div></div>`}
  const A=S.adj[t];if(!A)return'';const s=S.adjSide||1;
@@ -838,12 +869,12 @@ function adjPanel(t){
 }
 function materialPanel(){
  const t=S.tab,tabs=TABS[S.kind].filter(([k])=>k!=='earInner'||S.parts.ears.inner);
- let h=`<div class="group"><h4>娃娃類型</h4><div class="chips">${chip(S.kind==='animal','kind','animal','<b>🐻 動物布偶</b><small>一整塊的身體，加上耳朵、手、腳</small>')}${chip(S.kind==='human','kind','human',`<b>🧒 人形娃娃</b><small>頭＋身體素體（${TEMPLATES.n20.name}），有頭髮和刺繡臉</small>`)}</div></div>`;
+ let h=`<div class="group"><h4>娃娃類型</h4><div class="chips">${chip(S.kind==='animal','kind','animal','<b>🐻 動物布偶</b><small>一整塊的身體，加上耳朵、手、腳</small>')}${chip(S.kind==='human','kind','human',`<b>🧒 人形娃娃</b><small>頭＋身體素體，胖瘦高矮都能調，有頭髮和刺繡臉</small>`)}</div></div>`;
  h+=`<div class="tabs">${tabs.map(([k,n])=>{const on=k===t,s=k==='head'?'body':k,used=usedSlots().includes(s),f=designReady()&&used?fab(s):null,po=PART_KEYS.includes(k)||k==='belly'?S.parts[k]:null;
   return`<button class="tab ${on?'on':''}" data-act="tab" data-arg="${k}">${f?`<i class="sw" style="background:${f.color.hex}"></i>`:''}${n}${po&&po.id!=='none'?'・'+po.name:''}${k==='hair'&&S.hair.id!=='none'?'・'+S.hair.name:''}</button>`}).join('')}</div>`;
- if(t==='body'&&S.kind==='animal')h+=`<div class="group"><h4>身體造型</h4><div class="chips">${BODIES.map(b=>chip(S.body===b,'shape',b.id,`<b>${b.name}</b>`)).join('')}</div></div>`;
- else if(t==='body')h+=`<div class="group"><h4>身體素體</h4><div class="chips">${chip(true,'tab','body',`<b>${TEMPLATES.n20.name}</b><small>之後做的衣服，同身形的娃娃都能穿。胖胖體在下一版加入。</small>`)}</div></div>`;
- else if(t==='head')h+=`<div class="group"><h4>頭型</h4><div class="chips">${HEADS.map(b=>chip(S.head===b,'shape',b.id,`<b>${b.name}</b>`)).join('')}</div></div>`;
+ if(t==='body'&&S.kind==='animal')h+=`<div class="group"><h4>身體造型（先選一個基本形，再用滑桿調整）</h4><div class="chips">${BODIES.map(b=>chip(S.body===b,'shape',b.id,`<b>${b.name}</b>`)).join('')}</div></div>${sliders('body')}`;
+ else if(t==='body')h+=`<div class="group"><h4>身體素體：用滑桿自由調整</h4></div>${sliders('torso',`目前身形：<b id="shapeClass">${bodyClass()}</b>（之後做的衣服，只有同身形的娃娃能互穿）`)}`;
+ else if(t==='head')h+=`<div class="group"><h4>頭型（先選一個基本形，再用滑桿調整）</h4><div class="chips">${HEADS.map(b=>chip(S.head===b,'shape',b.id,`<b>${b.name}</b>`)).join('')}</div></div>${sliders('head')}`;
  else if(t==='hair')h+=`<div class="group"><h4>髮型</h4><div class="chips">${HAIRS.map(b=>chip(S.hair===b,'shape',b.id,`<b>${b.name}</b>`)).join('')}</div></div>`;
  else if(t!=='earInner'){h+=`<div class="group"><h4>${PARTS[t].label}造型</h4><div class="chips">${PARTS[t].opts.map(o=>chip(S.parts[t]===o,'shape',o.id,`<b>${o.name}</b>`)).join('')}</div></div>`;h+=adjPanel(t)}
  const s=slotOfTab(),hasFab=s==='body'||s==='earInner'||(s==='hair'?S.hair.id!=='none':S.parts[s].id!=='none');
@@ -1033,7 +1064,7 @@ function render(now){
   bubble(510,170,270,r.line,17,'down');
   ctx.font=`30px ${UI_FONT}`;ctx.textAlign='center';ctx.fillStyle='#e0a020';ctx.fillText('★'.repeat(r.stars)+'☆'.repeat(5-r.stars),645,130);
   ctx.font=`bold 15px ${UI_FONT}`;ctx.fillStyle='#8a5a3a';ctx.textAlign='left';ctx.fillText(`給 ${S.order.who} 的娃娃`,24,32);
-  ctx.font=`13px ${UI_FONT}`;ctx.fillStyle='#9a8778';ctx.fillText(`${S.kind==='human'?'人形娃娃・'+TEMPLATES.n20.name:S.body.name}・${new Set(usedSlots().map(s=>fabKey(fab(s)))).size} 種布・${softLabel(overallSoft())}`,24,54);
+  ctx.font=`13px ${UI_FONT}`;ctx.fillStyle='#9a8778';ctx.fillText(`${S.kind==='human'?'人形娃娃・'+bodyClass():S.body.name}・${new Set(usedSlots().map(s=>fabKey(fab(s)))).size} 種布・${softLabel(overallSoft())}`,24,54);
   S.confetti.forEach(p=>{ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.c;ctx.globalAlpha=clamp(p.l,0,1);ctx.fillRect(-4,-2.5,8,5);ctx.restore()});ctx.globalAlpha=1;
   break}
  }
