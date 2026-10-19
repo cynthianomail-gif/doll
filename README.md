@@ -14,6 +14,7 @@
 
 - [設計筆記與決策紀錄](docs/DESIGN.md)：概念、評估、研究、已做的決定、路線圖
 - [研究資料](docs/RESEARCH.md)：《Dressmaker》流程拆解、手作娃娃市場調查
+- [v1.0 上架計畫](docs/RELEASE_PLAN.md)：上架 itch.io 前還缺什麼、步驟與時程
 
 ## 開發方式
 
