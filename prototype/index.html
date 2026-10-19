@@ -75,7 +75,7 @@ aside{display:flex;flex-direction:column;gap:12px;min-width:0}
 </head>
 <body>
 <header>
-  <h1>🧸 娃娃工坊 <small style="font-size:12px;color:var(--muted);font-weight:normal">原型 v0.5</small></h1>
+  <h1>🧸 娃娃工坊 <small style="font-size:12px;color:var(--muted);font-weight:normal">原型 v0.6</small></h1>
   <div class="steps" id="steps"></div>
 </header>
 <main>
@@ -200,10 +200,15 @@ const DECOR=[
 const CLASSES=[['15cm 正常體',.82,1],['20cm 正常體',1,1],['25cm 正常體',1.27,1],['15cm 胖胖體',.82,1.38],['20cm 胖胖體',1,1.38],['25cm 胖胖體',1.27,1.38]];
 const classDims=cls=>{const c=CLASSES.find(x=>x[0]===cls);return{h:c[1],w:c[2]}};
 const GTYPES=[
- {id:'top',name:'上衣',piece:'衣身',slot:'top',mult:2,tags:[],params:[['sleeve','袖長',0,1,.5],['len','衣長',0,1,.45],['loose','寬鬆',1.02,1.25,1.08]]},
- {id:'pants',name:'褲子',piece:'褲片',slot:'bottom',mult:2,tags:['活潑'],params:[['len','褲長',.15,1,.45],['loose','寬鬆',1.02,1.3,1.1]]},
- {id:'skirt',name:'裙子',piece:'裙片',slot:'bottom',mult:2,tags:['可愛'],params:[['len','裙長',.15,1,.4],['flare','蓬度',0,1,.5]]},
- {id:'cape',name:'斗篷',piece:'斗篷',slot:'outer',mult:1,tags:['復古','高級'],params:[['len','長度',0,1,.5],['width','寬度',0,1,.5]]},
+ {id:'top',name:'上衣',piece:'衣身',slot:'top',mult:2,sizeBy:'body',anchor:'torso',cat:'cloth',tags:[],params:[['sleeve','袖長',0,1,.5],['len','衣長',0,1,.45],['loose','寬鬆',1.02,1.25,1.08]]},
+ {id:'pants',name:'褲子',piece:'褲片',slot:'bottom',mult:2,sizeBy:'body',anchor:'torso',cat:'cloth',tags:['活潑'],params:[['len','褲長',.15,1,.45],['loose','寬鬆',1.02,1.3,1.1]]},
+ {id:'skirt',name:'裙子',piece:'裙片',slot:'bottom',mult:2,sizeBy:'body',anchor:'torso',cat:'cloth',tags:['可愛'],params:[['len','裙長',.15,1,.4],['flare','蓬度',0,1,.5]]},
+ {id:'cape',name:'斗篷',piece:'斗篷',slot:'outer',mult:1,sizeBy:'body',anchor:'torso',cat:'cloth',tags:['復古','高級'],params:[['len','長度',0,1,.5],['width','寬度',0,1,.5]]},
+ {id:'beanie',name:'毛帽',piece:'帽片',slot:'hat',mult:2,sizeBy:'head',anchor:'head',cat:'acc',tags:['溫柔'],params:[['depth','帽深',0,1,.5],['pom','毛球',0,1,1]]},
+ {id:'beret',name:'貝雷帽',piece:'帽片',slot:'hat',mult:2,sizeBy:'head',anchor:'head',cat:'acc',tags:['高級','復古'],params:[['size','大小',0,1,.5],['tilt','歪斜',0,1,.75]]},
+ {id:'hairband',name:'髮帶',piece:'髮帶',slot:'band',mult:1,sizeBy:'none',anchor:'head',cat:'acc',tags:['可愛'],params:[['thick','粗細',0,1,.5]]},
+ {id:'clip',name:'蝴蝶結髮夾',piece:'蝴蝶結',slot:'clip',mult:2,sizeBy:'none',anchor:'head',cat:'acc',tags:['可愛','活潑'],params:[['pos','位置',0,1,.75],['size','大小',0,1,.5]]},
+ {id:'bag',name:'小包包',piece:'包身',slot:'bag',mult:2,sizeBy:'none',anchor:'torso',cat:'acc',tags:['活潑'],params:[['size','大小',0,1,.5]]},
 ];
 const GT_BY=Object.fromEntries(GTYPES.map(g=>[g.id,g]));
 const GTRIMS=['lace','button1','pocket','bow','flower','star','heart'];
@@ -221,6 +226,10 @@ const CLOTH_ORDERS=[
   need:[{tag:'活潑',min:2},{notType:'skirt'}],budget:100,
   lines:{good:'她一定會拿第一名！',mid:'嗯……應該跑得動。',bad:'這樣怎麼跑步啦！'}},
 ];
+CLOTH_ORDERS.push({type:'cloth',who:'小雨',emoji:'🧑‍🦱',text:'我的娃娃「大福」頭比較大，是頭圍 L。冬天到了，想幫她做一頂暖暖的帽子，戴起來軟軟的那種。',
+  doll:{head:{size:1.22},hair:'bob',hairColor:'cocoa',skin:'skin',decor:['eyes_stitch','mouth_smile','blush']},
+  need:[{needSlot:'hat',label:'要帽子'},{tag:'溫柔',min:2}],budget:70,
+  lines:{good:'大福戴起來好可愛，一點都不冷了！',mid:'還不錯，冬天可以戴。',bad:'這個……大福戴不太下。'}});
 const FREE_ORDER=mode=>({type:mode==='garment'?'cloth':'doll',free:true,who:'自由創作',emoji:'🧑‍🎨',text:mode==='garment'?'不接單，做一件自己想做的衣服，完成後收進衣櫃。':'不接單，做一隻自己想做的娃娃，完成後收進展示櫃。',need:[],soft:'any',budget:0,lines:{good:'完成了！',mid:'完成了！',bad:'完成了！'}});
 const DECOR_BY=Object.fromEntries(DECOR.map(d=>[d.id,d]));
 const SOFT={
@@ -374,6 +383,7 @@ function startOrder(){
  setStep('order');
 }
 function startFree(mode){S=blankState(FREE_ORDER(mode));setStep(mode==='garment'?'gdesign':'material')}
+function defaultCls(type,free){const sb=GT_BY[type].sizeBy;return sb==='none'?'通用':!free?null:sb==='head'?'頭圍 M':'20cm 正常體'}
 function newGarment(cls){return{type:'top',cls,fab:{mat:null,color:null},p:Object.fromEntries(GT_BY.top.params.map(x=>[x[0],x[4]])),trims:[],name:''}}
 // 建立一個完成的人形娃娃（客人的娃娃、人台）
 function buildDoll(spec){
@@ -442,8 +452,25 @@ const bodyClass=()=>bodyClassOf(S.shp);
 
 // ----- 衣服的形狀：版型依衣服的身形，手腳的角度跟著穿的娃娃 -----
 function clipY(P,y,keepAbove){const out=[],inside=p=>keepAbove?p.y<=y:p.y>=y;for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length],ia=inside(a),ib=inside(b);if(ia)out.push(a);if(ia!==ib){const t=(y-a.y)/(b.y-a.y);out.push({x:a.x+(b.x-a.x)*t,y})}}return out}
-function garmentPoly(g,m){
- const d=classDims(g.cls),b=m.sh.bumps,p=g.p,r=m.r,cx=m.cx,cy=m.cy;
+// c = {t: 身體主體, h: 頭主體}（穿的娃娃）
+const HCLASSES=[['頭圍 S',.88],['頭圍 M',1],['頭圍 L',1.18]];
+function headClassOf(shp){const hs=shp.head.size*Math.sqrt(shp.head.w*shp.head.h);return hs<.94?'頭圍 S':hs<=1.1?'頭圍 M':'頭圍 L'}
+const sizeOf=cls=>{const h=HCLASSES.find(x=>x[0]===cls);return h?h[1]:1};
+function garmentPoly(g,c){
+ const p=g.p,T=GT_BY[g.type];
+ if(T.anchor==='head'){
+  const m=c.h,hs=T.sizeBy==='head'?sizeOf(g.cls)*(R*.8)/m.r:1,r=m.r*hs,cx=m.cx,cy=m.cy,at=(t,k)=>{const rr=r*shapeR(m.sh,t)*k;return{x:cx+Math.cos(t)*rr,y:cy+Math.sin(t)*rr}};
+  if(g.type==='beanie'){const dep=(5+p.depth*30)*D,o=[];for(let i=0;i<=40;i++)o.push(at(Math.PI-dep+(Math.PI+2*dep)*i/40,1.12));
+   const yb=cy+Math.sin(dep)*r*.95-r*.06;o.push({x:cx+r*shapeR(m.sh,0)*.98,y:yb});for(let i=1;i<20;i++){const u=1-2*i/20;o.push({x:cx+u*r*shapeR(m.sh,0)*.98,y:yb+r*.03*(1-u*u)})}o.push({x:cx-r*shapeR(m.sh,Math.PI)*.98,y:yb});return o}
+  if(g.type==='beret'){const tl=(p.tilt-.5)*.6,c0={x:cx+tl*r*.6,y:cy-r*shapeR(m.sh,-Math.PI/2)*.82},rx=r*(.75+.4*p.size),ry=r*(.26+.08*p.size);return ellPoly(0,0,rx,ry,48).map(q=>{const v=rotV(q.x,q.y,tl*.6);return{x:c0.x+v.x,y:c0.y+v.y}})}
+  if(g.type==='hairband'){const w=.06+.1*p.thick,o=[];for(let i=0;i<=30;i++)o.push(at((200+140*i/30)*D,1.04+w));for(let i=30;i>=0;i--)o.push(at((200+140*i/30)*D,1.02));return o}
+  if(g.type==='clip'){const a=(-90+(p.pos-.5)*200)*D,q=at(a,1.0),s=r*(.14+.12*p.size),rot=a+Math.PI/2,o=[];
+   const wing=sd=>{const pts=[];qbez({x:0,y:0},{x:sd*1.2,y:-.9},{x:sd*1.3,y:0},10,pts);qbez({x:sd*1.3,y:0},{x:sd*1.2,y:.9},{x:0,y:0},10,pts);return pts};
+   wing(-1).concat(wing(1)).forEach(v=>{const w=rotV(v.x*s,v.y*s,rot);o.push({x:q.x+w.x,y:q.y+w.y})});return o}
+ }
+ if(g.type==='bag'){const m=c.t,b=m.sh.bumps[1],t=b[0]*D,rr=m.r*shapeR(m.sh,t)*.95,hx=m.cx+Math.cos(t)*rr,hy=m.cy+Math.sin(t)*rr,s=m.r*(.32+.25*p.size);
+  const o=[];qbez({x:hx-s*.5,y:hy+s*.15},{x:hx-s*.55,y:hy+s*1.05},{x:hx,y:hy+s*1.05},10,o);qbez({x:hx,y:hy+s*1.05},{x:hx+s*.55,y:hy+s*1.05},{x:hx+s*.5,y:hy+s*.15},10,o);o.push({x:hx+s*.45,y:hy+s*.1},{x:hx-s*.45,y:hy+s*.1});return o}
+ const m=c.t,d=classDims(g.cls),b=m.sh.bumps,r=m.r,cx=m.cx,cy=m.cy;
  if(g.type==='top'){const sl=Math.max(.12,p.sleeve),sh={ax:.62*d.w,ay:.6*d.h,bumps:[b[0],[b[1][0],b[1][1]*sl,b[1][2]*1.25],[b[2][0],b[2][1]*sl,b[2][2]*1.25]]};
   return clipY(outline(sh,1.07*p.loose*r/R,200,cx,cy),cy+r*(-.05+.6*p.len),true)}
  if(g.type==='pants'){const k=.25+.9*p.len,sh={ax:.62*d.w,ay:.6*d.h,bumps:[[b[3][0],b[3][1]*k,b[3][2]*1.3],[b[4][0],b[4][1]*k,b[4][2]*1.3]]};
@@ -453,15 +480,24 @@ function garmentPoly(g,m){
  const ty=cy-r*.45,tw=r*.3*d.w,by=cy+r*(.35+.9*p.len)*d.h,bw=r*(.85+.6*p.width)*d.w,o=[{x:cx-tw,y:ty},{x:cx+tw,y:ty}];
  qbez({x:cx+tw,y:ty},{x:cx+bw*.8,y:ty+r*.2},{x:cx+bw,y:by},14,o);qbez({x:cx+bw,y:by},{x:cx,y:by+r*.18},{x:cx-bw,y:by},18,o);qbez({x:cx-bw,y:by},{x:cx-bw*.8,y:ty+r*.2},{x:cx-tw,y:ty},14,o);return o;
 }
-function drawGarment(g,m,{showTrims=true}={}){
- if(!g.cls)return;const f=g.fab.mat?g.fab:{mat:MAT_BY.felt,color:COLOR_BY.cream},P=garmentPoly(g,m),c=centroid(P);
- drawBody(P,f.mat,f.color.hex,.3,c.x,c.y,m.r,2);
- if(g.done){ctx.setLineDash([3,4]);ctx.strokeStyle=lum(f.color.hex)>.55?shade(f.color.hex,-.5):'#fff3e0';ctx.lineWidth=1.4;pathFrom(P.map(p=>({x:c.x+(p.x-c.x)*.93,y:c.y+(p.y-c.y)*.93})));ctx.stroke();ctx.setLineDash([])}
- if(g.type==='cape'){ctx.strokeStyle=shade(f.color.hex,-.4);ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(m.cx-m.r*.28,m.cy-m.r*.44);ctx.quadraticCurveTo(m.cx,m.cy-m.r*.25,m.cx+m.r*.28,m.cy-m.r*.44);ctx.stroke()}
- if(showTrims)g.trims.forEach(t=>drawItem({type:t.type,x:m.cx+t.dx,y:m.cy+t.dy,s:t.s,rot:t.rot}));
+const anchorOf=(g,c)=>GT_BY[g.type].anchor==='head'?c.h:c.t;
+function drawGarment(g,c,{showTrims=true}={}){
+ if(!g.cls)return;const f=g.fab.mat?g.fab:{mat:MAT_BY.felt,color:COLOR_BY.cream},P=garmentPoly(g,c),ce=centroid(P),a=anchorOf(g,c),bb=bbox(P);
+ if(g.type==='bag'){const t=c.t;ctx.strokeStyle=shade(f.color.hex,-.4);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(t.cx-t.r*.3,t.cy-t.r*.42);ctx.quadraticCurveTo(ce.x,bb.y0-t.r*.5,ce.x+(bb.x1-bb.x0)*.3,bb.y0+2);ctx.stroke()}
+ drawBody(P,f.mat,f.color.hex,.3,ce.x,ce.y,Math.max(20,(bb.x1-bb.x0)*.6),2);
+ if(g.done){ctx.setLineDash([3,4]);ctx.strokeStyle=lum(f.color.hex)>.55?shade(f.color.hex,-.5):'#fff3e0';ctx.lineWidth=1.4;pathFrom(P.map(p=>({x:ce.x+(p.x-ce.x)*.9,y:ce.y+(p.y-ce.y)*.9})));ctx.stroke();ctx.setLineDash([])}
+ if(g.type==='cape'){const m=c.t;ctx.strokeStyle=shade(f.color.hex,-.4);ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(m.cx-m.r*.28,m.cy-m.r*.44);ctx.quadraticCurveTo(m.cx,m.cy-m.r*.25,m.cx+m.r*.28,m.cy-m.r*.44);ctx.stroke()}
+ if(g.type==='beanie'&&g.p.pom>.5){ctx.fillStyle=shade(f.color.hex,.35);ctx.strokeStyle=shade(f.color.hex,-.3);ctx.lineWidth=1.5;circle(ctx,(bb.x0+bb.x1)/2,bb.y0-4,c.h.r*.16);ctx.fill();ctx.stroke()}
+ if(g.type==='beret'){ctx.fillStyle=shade(f.color.hex,-.3);rrect(ctx,(bb.x0+bb.x1)/2-3,bb.y0-7,6,9,2);ctx.fill()}
+ if(g.type==='clip'){ctx.fillStyle=shade(f.color.hex,-.3);circle(ctx,ce.x,ce.y,c.h.r*.05);ctx.fill()}
+ if(showTrims)g.trims.forEach(t=>drawItem({type:t.type,x:a.cx+t.dx,y:a.cy+t.dy,s:t.s,rot:t.rot}));
 }
-const mannequinTorso=cls=>torsoOf(mannequin(cls));
-const gModel=()=>S.order.free?mannequin(S.g.cls||'20cm 正常體'):S.model;
+const ctxOf=d=>withDoll(d,()=>({t:getMain('torso'),h:getMain('head')}));
+function mannequinHead(hcls){const k='H'+hcls;if(!meta.mannequins[k])meta.mannequins[k]=buildDoll({head:{size:sizeOf(hcls)},hair:'none',skin:'cream',skinMat:'felt',name:`人台・${hcls}`});return meta.mannequins[k]}
+function craftModel(g){const sb=GT_BY[g.type].sizeBy;return sb==='head'?mannequinHead(g.cls||'頭圍 M'):sb==='body'?mannequin(g.cls||'20cm 正常體'):mannequin('20cm 正常體')}
+const gctx=()=>ctxOf(craftModel(S.g));
+const gModel=()=>S.order.free?craftModel(S.g):S.model;
+function fitClassOf(g,d){const sb=GT_BY[g.type].sizeBy;return sb==='head'?headClassOf(d.shp):sb==='body'?bodyClassOf(d.shp):'通用'}
 // 在模特兒身上預覽目前的衣服
 function drawModelWithGarment(now,showDecor=true){
  const m=gModel(),slot=GT_BY[S.g.type].slot,keepW=m.wear;m.wear={...(m.wear||{}),[slot]:S.g};
@@ -599,11 +635,12 @@ function evaluateGarment(){
  const o=S.order,g=S.g,t=gTally(g),comments=[],review=[];
  const reqS=o.need.map(n=>{
   if(n.notType){const ok=g.type!==n.notType;review.push({text:`不要${GT_BY[n.notType].name}`,ok});if(!ok)comments.push(`我說過不要${GT_BY[n.notType].name}的……`);return ok?1:0}
+  if(n.needSlot){const ok=GT_BY[g.type].slot===n.needSlot;review.push({text:n.label,ok});if(!ok)comments.push(`我想要的是${n.label.replace('要','')}耶……`);return ok?1:0}
   const v=t[n.tag];let s=1;
   if(n.min!=null&&v<n.min){s=Math.min(s,v/n.min);comments.push(`感覺不夠「${n.tag}」……`)}
   if(n.max!=null&&v>n.max){s=Math.min(s,Math.max(0,1-(v-n.max)*.4));comments.push(`太「${n.tag}」了啦。`)}
   review.push({text:n.max!=null&&n.min==null?`不要太「${n.tag}」`:n.max!=null?`「${n.tag}」但不要太過`:`「${n.tag}」`,ok:needOk(n,v)});return s});
- const tagS=avg(reqS),fitCls=bodyClassOf(S.model.shp),fit=g.cls===fitCls;
+ const tagS=avg(reqS),fitCls=fitClassOf(g,S.model),fit=g.cls===fitCls;
  review.push({text:'尺寸合身',ok:fit});if(!fit)comments.unshift(`這是 ${g.cls} 的尺寸，我的娃娃是 ${fitCls}，穿不下……`);
  const craft=craftScore(comments);if(craft<.55)comments.push('縫得有點粗糙。');
  const c=cost(),over=c>o.budget;review.push({text:'在預算內',ok:!over});if(over)comments.push(`超出預算了（$${c}），我只能付原本說好的錢。`);
@@ -613,16 +650,17 @@ function evaluateGarment(){
 }
 function enterDeliver(){
  S.sel=-1;
- if(S.mode==='garment'){S.g.trims=S.decor.map(it=>{const m=torsoOf(gModel());return{type:it.type,dx:it.x-m.cx,dy:it.y-m.cy,s:it.s,rot:it.rot}});S.g.done=true;S.decor=[];S.g.name=`${GT_BY[S.g.type].name}・${S.g.fab.color.name}`}
+ if(S.mode==='garment'){S.g.trims=S.decor.map(it=>{const m=anchorOf(S.g,ctxOf(gModel()));return{type:it.type,dx:it.x-m.cx,dy:it.y-m.cy,s:it.s,rot:it.rot}});S.g.done=true;S.g.id=S.g.id||newId();S.decor=[];S.g.name=`${GT_BY[S.g.type].name}・${S.g.fab.color.name}`}
  if(S.order.free){
   const comments=[],craft=craftScore(comments),c=cost();
   S.result={free:true,craft,cost:c,comments,stars:0};meta.coins-=c;
   if(S.mode==='garment')meta.clothes.push(S.g);else{S.wear={};S.name=`娃娃 ${meta.dolls.length+1}`;meta.dolls.push(S)}
+  saveGame();
   SFX.ding();for(let i=0;i<60;i++)S.confetti.push({x:CX-90+(Math.random()-.5)*80,y:CY-40,vx:(Math.random()-.5)*9,vy:-Math.random()*9-3,c:['#f4b6c6','#f6d96b','#a9d3ee','#a6dcc0','#e07a5f'][i%5],r:Math.random()*Math.PI,l:1});
   return;
  }
  S.result=S.mode==='garment'?evaluateGarment():evaluate();const r=S.result;
- meta.coins+=r.profit;meta.rep+=r.stars-3;meta.done++;
+ meta.coins+=r.profit;meta.rep+=r.stars-3;meta.done++;saveGame();
  if(r.stars>=4){SFX.ding();for(let i=0;i<90;i++)S.confetti.push({x:CX-90+(Math.random()-.5)*80,y:CY-40,vx:(Math.random()-.5)*9,vy:-Math.random()*9-3,c:['#f4b6c6','#f6d96b','#a9d3ee','#a6dcc0','#e07a5f'][i%5],r:Math.random()*Math.PI,l:1})}
  else if(r.stars<=2)SFX.sad();else SFX.pop();
 }
@@ -668,7 +706,8 @@ function drawDoll(now,{decor=true,sel=true,highlight=null}={}){
  if(S.offGrain>=3&&bf.mat.id==='cotton'){ctx.translate(CX,CY);ctx.transform(1,0,-.06,1,0,0);ctx.translate(-CX,-CY)}
  if(hg){if(hg.back)drawHair(hg.back,hg.m);if(hg.tails)hg.tails.forEach(P=>drawHair(P,hg.m))}
  const wear=S.kind==='human'?(S.wear||{}):{};
- if(wear.outer)drawGarment(wear.outer,getMain('torso'));
+ const wc=S.kind==='human'?{t:getMain('torso'),h:getMain('head')}:null;
+ if(wear.outer)drawGarment(wear.outer,wc);
  mains().forEach(m=>{
   activeParts('back').filter(k=>hostOf(k)===m.id).forEach(k=>[-1,1].forEach(s=>drawPart(k,s,fx)));
   const pts=mOutline(m);drawBody(pts,bf.mat,bf.color.hex,Math.min(1,mainFill(m.id)),m.cx,m.cy,m.r);
@@ -676,10 +715,12 @@ function drawDoll(now,{decor=true,sel=true,highlight=null}={}){
    ctx.setLineDash([4,4]);ctx.strokeStyle=lum(f.color.hex)>.55?shade(f.color.hex,-.5):'#fff3e0';ctx.lineWidth=1.6;pathFrom(bp.map(p=>({x:c.x+(p.x-c.x)*.9,y:c.y+(p.y-c.y)*.9})));ctx.stroke();ctx.setLineDash([]);ctx.restore()}
   S.stains.filter(s=>s.mid===m.id).forEach(s=>{const p=toDoll(m,s.dx,s.dy);drawStain(p.x,p.y,1.6*m.r/R)});
   drawStitches(m);drawMainFX(m);
-  if(m.id==='torso'){if(wear.bottom)drawGarment(wear.bottom,m);if(wear.top)drawGarment(wear.top,m)}
+  if(m.id==='torso'){if(wear.bottom)drawGarment(wear.bottom,wc);if(wear.top)drawGarment(wear.top,wc)}
  });
  if(hg)drawHair(hg.cap,hg.m);
+ if(wc){if(wear.band)drawGarment(wear.band,wc);if(wear.hat)drawGarment(wear.hat,wc);if(wear.clip)drawGarment(wear.clip,wc)}
  activeParts('front').forEach(k=>[-1,1].forEach(s=>drawPart(k,s,fx)));
+ if(wc&&wear.bag)drawGarment(wear.bag,wc);
  if(highlight){ctx.setLineDash([6,5]);ctx.strokeStyle='#e07a5f';ctx.lineWidth=2.5;
   const hl=P=>{pathFrom(P);ctx.stroke()};
   if(highlight==='body')hl(mOutline(getMain(S.kind==='human'?'torso':'body'),1,120));
@@ -697,7 +738,7 @@ function grainOk(mat,r){const g=mat.grain;return g==='none'||(g==='two'&&r%2===0
 function buildUnits(){
  const U=[],sc=(P,k)=>P.map(p=>({x:p.x*R*k,y:p.y*R*k}));
  const add=(name,slot,mult,Ppx,mid)=>{const b=bbox(Ppx),off={x:(b.x0+b.x1)/2,y:(b.y0+b.y1)/2};U.push({name,slot,mult,main:mid,P:Ppx.map(p=>({x:p.x-off.x,y:p.y-off.y})),off,size:Math.max(b.x1-b.x0,b.y1-b.y0),x:0,y:0,rot:0})};
- if(S.mode==='garment'){const g=S.g,m=mannequinTorso(g.cls),T=GT_BY[g.type];add(T.piece,'garment',T.mult,resample(garmentPoly(g,m),160).map(p=>({x:p.x-m.cx,y:p.y-m.cy})),null);return U}
+ if(S.mode==='garment'){const g=S.g,c=gctx(),P=garmentPoly(g,c),ce=centroid(P),T=GT_BY[g.type];add(T.piece,'garment',T.mult,resample(P,160).map(p=>({x:p.x-ce.x,y:p.y-ce.y})),null);return U}
  mains().slice().reverse().forEach(m=>add(m.name,'body',2,outline(m.sh,1.06*m.r/R,120,0,0),m.id));
  const hg=hairGeo();if(hg){const rel=P=>P.map(p=>({x:p.x-hg.m.cx,y:p.y-hg.m.cy}));add('瀏海','hair',1,rel(hg.cap));if(hg.back)add('後髮','hair',1,rel(hg.back));if(hg.tails)add('馬尾','hair',2,rel(hg.tails[0]))}
  const pk=key=>Math.max(adjOf(key,-1).scale,adjOf(key,1).scale)*getMain(hostOf(key)).r/R;
@@ -769,7 +810,7 @@ function makeSeam(m){
  activeParts().filter(k=>hostOf(k)===m.id).forEach(k=>[-1,1].forEach(s=>{const th=(-90+s*adjOf(k,s).a)*D;sw.path.forEach(p=>{if(Math.abs(angDiff(p.t,th))<10*D){p.lim=Math.min(p.lim,.4);p.part=true}})}));
  return sw;
 }
-function garmentSeam(){const m=mannequinTorso(S.g.cls),P=resample(garmentPoly(S.g,m),320),c=centroid(P);
+function garmentSeam(){const P=resample(garmentPoly(S.g,gctx()),320),c=centroid(P);
  return seamFromPts('garment',GT_BY[S.g.type].name,P.map(p=>({x:c.x+(p.x-c.x)*.93,y:c.y+(p.y-c.y)*.93})),c.x,c.y,90,25)}
 function seamFor(id){return id==='garment'?garmentSeam():makeSeam(getMain(id))}
 function resetSew(){Object.assign(S.sew,{list:S.mode==='garment'?[garmentSeam()]:mains().slice().reverse().map(makeSeam),cur:0,flash:'',flashT:0,backHold:false,backT:0})}
@@ -850,7 +891,7 @@ const POS_A={eyes:[0,-.22],nose:[0,-.04],mouth:[0,.1],cheek:[0,0],acc:[.55,-.72]
 const POS_H={eyes:['head',0,.14],nose:['head',0,.27],mouth:['head',0,.38],cheek:['head',0,.3],acc:['head',.62,-.55],body:['torso',-.15,.05],neck:['torso',0,-.62]};
 function decorPos(pos){if(S.kind==='human'){const[h,x,y]=POS_H[pos],m=getMain(h);return{x:m.cx+x*m.r,y:m.cy+y*m.r}}const[x,y]=POS_A[pos];return{x:CX+x*R,y:CY+y*R}}
 function addDecor(id){
- const d=DECOR_BY[id],gm=S.mode==='garment'?torsoOf(gModel()):null,p=gm?centroid(garmentPoly(S.g,gm)):decorPos(d.pos),same=S.decor.filter(x=>DECOR_BY[x.type].pos===d.pos).length;
+ const d=DECOR_BY[id],gm=S.mode==='garment'?ctxOf(gModel()):null,p=gm?centroid(garmentPoly(S.g,gm)):decorPos(d.pos),same=S.decor.filter(x=>DECOR_BY[x.type].pos===d.pos).length;
  S.decor.push({type:id,x:p.x+same*12,y:p.y+same*10,s:gm?.8:S.kind==='human'?.85:1,rot:0});S.sel=S.decor.length-1;SFX.pop();renderControls();renderSide(true);
 }
 function hitDecor(p){let best=-1,bs=1;S.decor.forEach((it,i)=>{const s=dist(p,it)/(DECOR_BY[it.type].hit*it.s);if(s<=bs){bs=s;best=i}});return best}
@@ -879,6 +920,41 @@ function movePartDrag(p){
  const m=getMain(hostOf(d.key)),t={x:p.x-d.ox,y:p.y-d.oy},phi=Math.atan2(t.y-m.cy,t.x-m.cx);
  const a=clamp(angDiff(phi,-Math.PI/2)/D*d.side,0,180),rEdge=m.r*shapeR(m.sh,phi)*radiusScale(m,phi),inset=clamp(1-dist(t,{x:m.cx,y:m.cy})/rEdge,-.3,.45);
  setAdj(d.key,d.side,q=>{q.a=a;q.inset=inset});
+}
+
+
+// ===================== 存檔（瀏覽器 localStorage） =====================
+const SAVE_KEY='doll-workshop-save-v1';
+const newId=()=>'g'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function serGarment(g){return{id:g.id,type:g.type,cls:g.cls,fab:{mat:g.fab.mat.id,color:g.fab.color.id},p:g.p,trims:g.trims,name:g.name}}
+function deGarment(o){return{...o,done:true,fab:{mat:MAT_BY[o.fab.mat],color:COLOR_BY[o.fab.color]},trims:o.trims||[]}}
+const ser2=f=>f?{mat:f.mat&&f.mat.id,color:f.color&&f.color.id}:null;
+function serDoll(d){
+ return{name:d.name,kind:d.kind,body:d.body.id,head:d.head.id,hair:d.hair.id,parts:Object.fromEntries(Object.entries(d.parts).map(([k,o])=>[k,o.id])),adj:d.adj,shp:d.shp,
+  fab:Object.fromEntries(Object.entries(d.fab).map(([k,f])=>[k,ser2(f)])),decor:d.decor,regs:(d.stuff.regs||[]).map(r=>[r.fill,r.lump]),stains:d.stains,offGrain:d.offGrain,
+  sew:d.sew.list.map(x=>({mid:x.mid,cx:x.cx,cy:x.cy,backStart:x.backStart,backEnd:x.backEnd,stitches:x.stitches.filter(t=>!t.bad).map(t=>[Math.round(t.dx*10)/10,Math.round(t.dy*10)/10])})),
+  wear:Object.fromEntries(Object.entries(d.wear||{}).map(([k,g])=>[k,g.id]))};
+}
+function deDoll(o,byId){
+ const keep=S,d=blankState({who:'',free:true,need:[]});S=d;
+ try{
+  d.kind=o.kind;d.body=BODIES.find(b=>b.id===o.body)||BODIES[0];d.head=HEADS.find(b=>b.id===o.head)||HEADS[0];d.hair=HAIRS.find(b=>b.id===o.hair)||HAIRS[0];
+  Object.keys(d.parts).forEach(k=>{d.parts[k]=PARTS[k].opts.find(x=>x.id===(o.parts||{})[k])||NONE(k)});
+  d.adj=o.adj||{};d.shp=Object.assign(SHP_DEFAULT(),o.shp||{});
+  Object.entries(o.fab||{}).forEach(([k,f])=>{d.fab[k]=f?{mat:MAT_BY[f.mat],color:COLOR_BY[f.color]}:null});if(!d.fab.body)d.fab.body={};
+  rebuildShapes();d.stuff.regs=regionsFor();(o.regs||[]).forEach(([f,l],i)=>{if(d.stuff.regs[i]){d.stuff.regs[i].fill=f;d.stuff.regs[i].lump=l}});d.stuff.closed=true;
+  d.decor=o.decor||[];d.stains=o.stains||[];d.offGrain=o.offGrain||0;
+  d.sew.list=(o.sew||[]).map(x=>({...x,pins:[],path:[],done:true,stitches:x.stitches.map(([dx,dy])=>({dx,dy,q:1,bad:false}))}));
+  d.step='done';d.name=o.name;d.wear={};Object.entries(o.wear||{}).forEach(([k,id])=>{if(byId[id])d.wear[k]=byId[id]});
+ }finally{S=keep}
+ return d;
+}
+function saveGame(){try{localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,coins:meta.coins,rep:meta.rep,done:meta.done,clothes:meta.clothes.map(serGarment),dolls:meta.dolls.map(serDoll)}))}catch(e){console.warn('存檔失敗',e)}}
+function loadGame(){
+ try{const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;const o=JSON.parse(raw);
+  meta.coins=o.coins;meta.rep=o.rep;meta.done=o.done;meta.clothes=(o.clothes||[]).map(deGarment);
+  const byId=Object.fromEntries(meta.clothes.map(g=>[g.id,g]));meta.dolls=(o.dolls||[]).map(x=>deDoll(x,byId));
+ }catch(e){console.warn('讀取存檔失敗',e)}
 }
 
 // ===================== 輸入 =====================
@@ -937,7 +1013,7 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>{if(e.code==='KeyB'&&S.step==='sew')S.sew.backHold=false;if(e.code==='Space'&&S.step==='sew')e.preventDefault()});
 const ctrl=document.getElementById('controls');
 ctrl.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&!b.disabled){ensureAudio();ACT[b.dataset.act](b.dataset.arg);if(document.activeElement)document.activeElement.blur()}});
-ctrl.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.gp){S.g.p[t.dataset.gp]=+t.value;return}if(!t.dataset||!t.dataset.sl)return;const[g,k]=t.dataset.sl.split('.');S.shp[g][k]=+t.value;rebuildShapes();const c=document.getElementById('shapeClass');if(c)c.textContent=bodyClass()});
+ctrl.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.gp){S.g.p[t.dataset.gp]=+t.value;return}if(!t.dataset||!t.dataset.sl)return;const[g,k]=t.dataset.sl.split('.');S.shp[g][k]=+t.value;rebuildShapes();const c=document.getElementById('shapeClass');if(c)c.textContent=bodyClass();const hc=document.getElementById('headClass');if(hc)hc.textContent=headClassOf(S.shp)});
 ctrl.addEventListener('pointerdown',e=>{if(e.target.closest('[data-hold=back]')){ensureAudio();S.sew.backHold=true}});
 window.addEventListener('pointerup',()=>{if(S&&S.step==='sew')S.sew.backHold=false});
 
@@ -946,7 +1022,7 @@ const ACT={
  accept(){setStep(S.mode==='garment'?'gdesign':'material')},
  skip(){startOrder()},
  free(mode){startFree(mode)},
- gtype(id){S.g.type=id;S.g.p=Object.fromEntries(GT_BY[id].params.map(x=>[x[0],x[4]]));SFX.pop();renderControls()},
+ gtype(id){const was=GT_BY[S.g.type].sizeBy;S.g.type=id;if(GT_BY[id].sizeBy!==was)S.g.cls=defaultCls(id,S.order.free);S.g.p=Object.fromEntries(GT_BY[id].params.map(x=>[x[0],x[4]]));SFX.pop();renderControls()},
  gcls(c){S.g.cls=c;SFX.pop();renderControls()},
  gmat(id){S.g.fab.mat=MAT_BY[id];SFX.pop();renderControls()},
  gcolor(id){S.g.fab.color=COLOR_BY[id];SFX.pop();renderControls()},
@@ -956,8 +1032,9 @@ const ACT={
  model(i){const list=closetModels();meta.closet.model=list[+i];SFX.pop();renderControls()},
  wear(i){const C=meta.closet,g=meta.clothes[+i],m=C.model,slot=GT_BY[g.type].slot;
   if(m.kind!=='human'){flash(C,'布偶不能穿衣服（之後的版本再加）');SFX.no();return}
-  const mc=bodyClassOf(m.shp);if(g.cls!==mc){flash(C,`穿不下：這件是 ${g.cls}，${m.name||'娃娃'}是 ${mc}`);SFX.no();return}
-  m.wear=m.wear||{};if(m.wear[slot]===g)delete m.wear[slot];else m.wear[slot]=g;SFX.pop();renderControls()},
+  const mc=fitClassOf(g,m);if(g.cls!==mc){flash(C,`穿不下：這件是 ${g.cls}，${m.name||'娃娃'}是 ${mc}`);SFX.no();return}
+  m.wear=m.wear||{};if(m.wear[slot]===g)delete m.wear[slot];else m.wear[slot]=g;SFX.pop();saveGame();renderControls()},
+ resetSave(){if(confirm('確定要清除所有收藏、衣服和金錢，從頭開始嗎？')){try{localStorage.removeItem(SAVE_KEY)}catch(e){}location.reload()}},
  kind(k){if(S.kind===k)return;S.kind=k;PART_KEYS.concat('belly').forEach(p=>{S.parts[p]=NONE(p);S.adj[p]=null});S.tab=k==='human'?'head':'body';
   if(k==='human'&&!S.fab.body.color)S.fab.body.color=COLOR_BY.skin;rebuildShapes();SFX.pop();renderControls();renderSide(true)},
  resetShape(g){S.shp[g]=SHP_DEFAULT()[g];rebuildShapes();SFX.pop();renderControls()},
@@ -1003,7 +1080,7 @@ const ACT={
  save(){const a=document.createElement('a');a.download=`娃娃_給${S.order.who}.png`;a.href=cv.toDataURL('image/png');a.click()},
  next(){startOrder()},
 };
-function closetModels(){return CLASSES.map(c=>mannequin(c[0])).concat(meta.dolls)}
+function closetModels(){return CLASSES.map(c=>mannequin(c[0])).concat(HCLASSES.map(h=>mannequinHead(h[0])),meta.dolls)}
 function slotOfTab(){return S.tab==='head'?'body':S.tab}
 
 // ===================== 介面 =====================
@@ -1031,7 +1108,7 @@ function materialPanel(){
   return`<button class="tab ${on?'on':''}" data-act="tab" data-arg="${k}">${f?`<i class="sw" style="background:${f.color.hex}"></i>`:''}${n}${po&&po.id!=='none'?'・'+po.name:''}${k==='hair'&&S.hair.id!=='none'?'・'+S.hair.name:''}</button>`}).join('')}</div>`;
  if(t==='body'&&S.kind==='animal')h+=`<div class="group"><h4>身體造型（先選一個基本形，再用滑桿調整）</h4><div class="chips">${BODIES.map(b=>chip(S.body===b,'shape',b.id,`<b>${b.name}</b>`)).join('')}</div></div>${sliders('body')}`;
  else if(t==='body')h+=`<div class="group"><h4>身體素體：用滑桿自由調整</h4></div>${sliders('torso',`目前身形：<b id="shapeClass">${bodyClass()}</b>（之後做的衣服，只有同身形的娃娃能互穿）`)}`;
- else if(t==='head')h+=`<div class="group"><h4>頭型（先選一個基本形，再用滑桿調整）</h4><div class="chips">${HEADS.map(b=>chip(S.head===b,'shape',b.id,`<b>${b.name}</b>`)).join('')}</div></div>${sliders('head')}`;
+ else if(t==='head')h+=`<div class="group"><h4>頭型（先選一個基本形，再用滑桿調整）</h4><div class="chips">${HEADS.map(b=>chip(S.head===b,'shape',b.id,`<b>${b.name}</b>`)).join('')}</div></div>${sliders('head',`目前頭圍：<b id="headClass">${headClassOf(S.shp)}</b>（帽子要同頭圍才戴得下）`)}`;
  else if(t==='hair')h+=`<div class="group"><h4>髮型</h4><div class="chips">${HAIRS.map(b=>chip(S.hair===b,'shape',b.id,`<b>${b.name}</b>`)).join('')}</div></div>`;
  else if(t!=='earInner'){h+=`<div class="group"><h4>${PARTS[t].label}造型</h4><div class="chips">${PARTS[t].opts.map(o=>chip(S.parts[t]===o,'shape',o.id,`<b>${o.name}</b>`)).join('')}</div></div>`;h+=adjPanel(t)}
  const s=slotOfTab(),hasFab=s==='body'||s==='earInner'||(s==='hair'?S.hair.id!=='none':S.parts[s].id!=='none');
@@ -1041,10 +1118,14 @@ function materialPanel(){
  h+=`<div class="row"><button class="btn main" data-act="toLayout" ${designReady()?'':'disabled'}>設計好了，去排版 →</button></div>`;
  return h;
 }
+const GDESC={top:'穿在身上，可以調袖長',pants:'兩條褲管，跟著腿走',skirt:'從腰往下張開',cape:'披在背後的外衣',beanie:'包住頭的針織帽，可以加毛球',beret:'扁扁斜斜的帽子',hairband:'壓在頭髮上的布髮帶',clip:'夾在頭上的蝴蝶結',bag:'掛在手上的小包包'};
 function gdesignPanel(){
  const g=S.g,T=GT_BY[g.type],free=S.order.free;
- let h=`<div class="group"><h4>衣服種類</h4><div class="chips">${GTYPES.map(x=>chip(g.type===x.id,'gtype',x.id,`<b>${x.name}</b><small>${{top:'穿在身上，可以調袖長',pants:'兩條褲管，跟著腿走',skirt:'從腰往下張開',cape:'披在背後的外衣'}[x.id]}</small>`)).join('')}</div></div>
- <div class="group"><h4>尺寸（身形）${free?'':'<small>——看清楚客人的娃娃是什麼身形，做錯會穿不下</small>'}</h4><div class="chips">${CLASSES.map(c=>chip(g.cls===c[0],'gcls',c[0],`<b>${c[0]}</b>`)).join('')}</div></div>
+ let h=`<div class="group"><h4>衣服</h4><div class="chips">${GTYPES.filter(x=>x.cat==='cloth').map(x=>chip(g.type===x.id,'gtype',x.id,`<b>${x.name}</b><small>${GDESC[x.id]}</small>`)).join('')}</div></div>
+ <div class="group"><h4>帽子與配件</h4><div class="chips">${GTYPES.filter(x=>x.cat==='acc').map(x=>chip(g.type===x.id,'gtype',x.id,`<b>${x.name}</b><small>${GDESC[x.id]}${x.sizeBy==='none'?'（通用尺寸）':''}</small>`)).join('')}</div></div>
+ ${T.sizeBy==='body'?`<div class="group"><h4>尺寸（身形）${free?'':'<small>——看清楚客人的娃娃是什麼身形，做錯會穿不下</small>'}</h4><div class="chips">${CLASSES.map(c=>chip(g.cls===c[0],'gcls',c[0],`<b>${c[0]}</b>`)).join('')}</div></div>`
+  :T.sizeBy==='head'?`<div class="group"><h4>尺寸（頭圍）${free?'':'<small>——帽子要跟娃娃的頭圍一樣才戴得下</small>'}</h4><div class="chips">${HCLASSES.map(c=>chip(g.cls===c[0],'gcls',c[0],`<b>${c[0]}</b>`)).join('')}</div></div>`
+  :'<div class="group"><h4>尺寸：通用，每隻人形娃娃都能戴</h4></div>'}
  <div class="sliders">${T.params.map(([k,n,a,b])=>`<label><span>${n}</span><input type="range" min="${a}" max="${b}" step="0.01" value="${g.p[k]}" data-gp="${k}"></label>`).join('')}</div>
  <div class="group"><h4>布料</h4><div class="chips">${MATERIALS.map(m=>chip(g.fab.mat===m,'gmat',m.id,`<b>${m.name}</b><em>每 10cm $${m.p10}</em><small>${m.desc}</small>`)).join('')}</div></div>
  <div class="group"><h4>顏色</h4><div class="chips">${COLORS.map(c=>chip(g.fab.color===c,'gcolor',c.id,`<b><i class="sw" style="background:${c.hex}"></i>${c.name}</b>`)).join('')}</div></div>
@@ -1053,10 +1134,10 @@ function gdesignPanel(){
 }
 function closetPanel(){
  const C=meta.closet,ms=closetModels(),m=C.model;
- let h=`<div class="group"><h4>穿衣服的娃娃（人台＝空白的身形模特兒）</h4><div class="chips">${ms.map((d,i)=>chip(d===m,'model',i,`<b>${d.name||'娃娃'}</b><small>${d.kind==='human'?bodyClassOf(d.shp):'動物布偶'}</small>`)).join('')}</div></div>`;
- h+=`<div class="group"><h4>衣櫃（${meta.clothes.length} 件）——點一下穿上／脫下</h4>${meta.clothes.length?`<div class="chips">${meta.clothes.map((g,i)=>{const on=m.wear&&m.wear[GT_BY[g.type].slot]===g,fit=m.kind==='human'&&bodyClassOf(m.shp)===g.cls;
+ let h=`<div class="group"><h4>穿衣服的娃娃（人台＝空白的身形模特兒）</h4><div class="chips">${ms.map((d,i)=>chip(d===m,'model',i,`<b>${d.name||'娃娃'}</b><small>${d.kind==='human'?bodyClassOf(d.shp)+'・'+headClassOf(d.shp):'動物布偶'}</small>`)).join('')}</div></div>`;
+ h+=`<div class="group"><h4>衣櫃（${meta.clothes.length} 件）——點一下穿上／脫下</h4>${meta.clothes.length?`<div class="chips">${meta.clothes.map((g,i)=>{const on=m.wear&&m.wear[GT_BY[g.type].slot]===g,fit=m.kind==='human'&&fitClassOf(g,m)===g.cls;
   return chip(on,'wear',i,`<b><i class="sw" style="background:${g.fab.color.hex}"></i>${g.name}${on?' ✔':''}</b><small>${g.cls}${fit?'':'・<span class="n">尺寸不合</span>'}</small>`)}).join('')}</div>`:'<div class="tips">還沒有衣服。回到工作室，用「自由創作：做衣服」做幾件吧。</div>'}</div>
- <div class="row"><button class="btn main" data-act="leaveCloset">← 回到工作室</button></div>`;
+ <div class="row"><button class="btn main" data-act="leaveCloset">← 回到工作室</button><span class="tips">收藏會自動存在這個瀏覽器裡。</span><button class="btn small" data-act="resetSave">清除存檔</button></div>`;
  return h;
 }
 function renderControls(){
@@ -1109,7 +1190,7 @@ function updateStatus(){
  const el=document.getElementById('status');if(!el)return;let t='';
  switch(S.step){
   case'order':t=S.mode==='garment'?'有客人帶著自己的娃娃來訂做衣服。仔細讀客人說的話，也要看清楚娃娃的身形。':'有客人上門了。仔細讀客人說的話——你要自己判斷對方想要什麼樣的娃娃。';break;
-  case'gdesign':t=S.g.cls?`選種類、尺寸、布料，用滑桿調整樣式。${S.order.free?'':'畫面上是客人的娃娃，尺寸不對的話，衣服會看起來太小或太大。'}`:'先選尺寸（身形）。';break;
+  case'gdesign':t=S.g.cls?`選種類、尺寸、布料，用滑桿調整樣式。${GT_BY[S.g.type].cat==='acc'?'帽子看頭圍，其他配件是通用尺寸。':''}${S.order.free?'':'畫面上是客人的娃娃，尺寸不對的話，衣服會看起來太小或太大。'}`:'先選尺寸（身形）。';break;
   case'gdecor':t=`在衣服上加蕾絲、鈕扣、口袋等裝飾。拖曳移動、滾輪縮放。目前花費 $${cost()}${S.order.free?'':` ／ 預算 $${S.order.budget}`}`;break;
   case'closet':{const C=meta.closet;t=`選一隻娃娃或人台，點衣服穿上。只有同身形的衣服穿得下。${flashing(C)?` <span class="warn">${C.flash}</span>`:''}`;break}
   case'material':t=designReady()?`點畫面上的部位可以切換；<b>耳朵、手、腳、肚子可以直接拖曳移動</b>。<span class="tip">（用到 ${new Set(usedSlots().map(s=>fabKey(fab(s)))).size} 種布）</span>`:`先選${slotName('body')}的布料和顏色，其他部位預設會跟著一樣。`;break;
@@ -1141,7 +1222,7 @@ function renderSide(force){
   <li><span>合計 ／ 預算</span><span class="${c<=o.budget?'':'n'}">$${c} ／ $${o.budget}</span></li>
   <li><span>手工</span><span class="q">裁布 ${S.cut.accs.length?pct(S.cut.acc):'—'} ・ 車縫 ${sewAllDone()?pct(sewAcc()):'—'}</span></li></ul></div>
  <div class="card wallet"><span>💰 $${meta.coins}</span><span>⭐ 聲望 ${meta.rep}</span><span>🧸 ${meta.done} 件</span></div>
- <div class="card tips">這是玩法原型 v0.5：動物布偶或人形娃娃，以及衣服。<br>耳朵、手、腳、肚子可以拖曳移動。客人的需求要靠你自己解讀，交件後才會知道客人在意什麼。</div>`;
+ <div class="card tips">這是玩法原型 v0.6：動物布偶或人形娃娃、衣服、帽子與配件。收藏會存在這個瀏覽器裡。<br>耳朵、手、腳、肚子可以拖曳移動。客人的需求要靠你自己解讀，交件後才會知道客人在意什麼。</div>`;
  if(force||h!==sideCache){document.getElementById('side').innerHTML=h;sideCache=h}
 }
 
@@ -1206,7 +1287,7 @@ function render(now){
   if(ptr.inside&&!c.done){ctx.font=`30px ${EMOJI_FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.save();ctx.translate(ptr.x,ptr.y);ctx.rotate(ptr.down?Math.sin(now/40)*.25:0);ctx.fillText('✂️',0,0);ctx.restore()}
   break}
  case'sew':{bgPlain();const sw=SW(),m=swMain(sw);
-  if(S.mode==='garment'){drawGarment(S.g,mannequinTorso(S.g.cls),{showTrims:false});drawStitches(null,sw)}else drawDoll(now,{decor:false});
+  if(S.mode==='garment'){drawGarment(S.g,gctx(),{showTrims:false});drawStitches(null,sw)}else drawDoll(now,{decor:false});
   ctx.setLineDash([4,5]);ctx.lineWidth=2;ctx.strokeStyle=lum(fab('body').color.hex)>.5?'rgba(80,50,40,.55)':'rgba(255,255,255,.7)';ctx.beginPath();sw.path.forEach((p,k)=>{if(k>=sw.idx)k===sw.idx?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y)});ctx.stroke();ctx.setLineDash([]);
   ctx.strokeStyle='rgba(90,140,220,.55)';ctx.lineWidth=6;ctx.lineCap='round';ctx.beginPath();let pen=false;sw.path.forEach((p,k)=>{if(p.part&&k>=sw.idx){pen?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y);pen=true}else pen=false});ctx.stroke();
   ctx.strokeStyle='rgba(240,150,60,.75)';ctx.lineWidth=5;pinGaps().forEach(([a,b])=>{const s=Math.max(a,sw.idx);if(s>=b)return;ctx.beginPath();for(let k=s;k<=b;k++)k===s?ctx.moveTo(sw.path[k].x,sw.path[k].y):ctx.lineTo(sw.path[k].x,sw.path[k].y);ctx.stroke()});
@@ -1260,7 +1341,7 @@ function render(now){
   hint('點下方的裝飾加到衣服上；拖曳移動、滾輪縮放');break}
  case'closet':{bgPlain();const m=meta.closet.model;withDoll(m,()=>drawDoll(now,{sel:false}));
   ctx.font=`bold 15px ${UI_FONT}`;ctx.fillStyle='#8a5a3a';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(m.name||'娃娃',24,24);
-  ctx.font=`13px ${UI_FONT}`;ctx.fillStyle='#9a8778';ctx.fillText(m.kind==='human'?`身形：${bodyClassOf(m.shp)}`:'動物布偶',24,46);
+  ctx.font=`13px ${UI_FONT}`;ctx.fillStyle='#9a8778';ctx.fillText(m.kind==='human'?`身形：${bodyClassOf(m.shp)}・${headClassOf(m.shp)}`:'動物布偶',24,46);
   const C=meta.closet;if(flashing(C)){ctx.font=`bold 16px ${UI_FONT}`;ctx.fillStyle='#d0534a';ctx.textAlign='center';ctx.fillText(C.flash,W/2,H-28)}
   hint('衣櫃：同身形的衣服可以互穿');break}
  case'deliver':{const r=S.result;const g=ctx.createRadialGradient(CX-90,CY-40,40,CX-90,CY,520);g.addColorStop(0,'#fff6ea');g.addColorStop(1,'#e9cfb5');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
@@ -1298,7 +1379,7 @@ function update(dt,now){
 }
 let lastT=performance.now(),sideT=0;
 function loop(now){const dt=Math.min(.05,(now-lastT)/1000);lastT=now;update(dt,now);render(now);if(now-sideT>250){renderSide();sideT=now}requestAnimationFrame(loop)}
-startOrder();requestAnimationFrame(loop);
+loadGame();startOrder();requestAnimationFrame(loop);
 </script>
 </body>
 </html>
