@@ -8,7 +8,7 @@
 
 用瀏覽器（Chrome 或 Edge）直接打開 [`prototype/index.html`](prototype/index.html)，不需要安裝任何東西。
 
-目前版本：**原型 v0.3**
+目前版本：**原型 v0.4**（動物布偶或人形娃娃；部件可以拖曳移動）
 
 ## 文件
 
