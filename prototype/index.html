@@ -473,8 +473,14 @@ function garmentPoly(g,c){
  const m=c.t,d=classDims(g.cls),b=m.sh.bumps,r=m.r,cx=m.cx,cy=m.cy;
  if(g.type==='top'){const sl=Math.max(.12,p.sleeve),sh={ax:.62*d.w,ay:.6*d.h,bumps:[b[0],[b[1][0],b[1][1]*sl,b[1][2]*1.25],[b[2][0],b[2][1]*sl,b[2][2]*1.25]]};
   return clipY(outline(sh,1.07*p.loose*r/R,200,cx,cy),cy+r*(-.05+.6*p.len),true)}
- if(g.type==='pants'){const k=.25+.9*p.len,sh={ax:.62*d.w,ay:.6*d.h,bumps:[[b[3][0],b[3][1]*k,b[3][2]*1.3],[b[4][0],b[4][1]*k,b[4][2]*1.3]]};
-  return clipY(outline(sh,1.07*p.loose*r/R,200,cx,cy),cy-.08*r,false)}
+ if(g.type==='pants'){
+  // 褲子＝臀部（橢圓）＋兩條褲管（沿著娃娃的腿），用從中心往外的最大半徑合成一個外形
+  const hip={ax:.62*d.w*1.07*p.loose,ay:.6*d.h*1.05},legs=[3,4].map(i=>{const a=b[i][0]*D,dir={x:Math.cos(a),y:Math.sin(a)},tip=r*shapeR(m.sh,a),A={x:dir.x*r*.2,y:dir.y*r*.2},L=Math.max(0,tip-r*.2)*(.35+.75*p.len);
+   return{A,B:{x:A.x+dir.x*L,y:A.y+dir.y*L},w:r*b[i][2]*1.15*p.loose*(d.w>1.2?1.2:1)}});
+  const segD=(q,A,B)=>{const vx=B.x-A.x,vy=B.y-A.y,t=clamp(((q.x-A.x)*vx+(q.y-A.y)*vy)/(vx*vx+vy*vy||1),0,1);return Math.hypot(q.x-A.x-vx*t,q.y-A.y-vy*t)};
+  const pts=[];for(let i=0;i<200;i++){const t=i/200*2*Math.PI,ux=Math.cos(t),uy=Math.sin(t);let rr=r*shapeR(hip,t);
+   legs.forEach(l=>{for(let k=r*2.2;k>rr;k-=1.5){if(segD({x:ux*k,y:uy*k},l.A,l.B)<=l.w){rr=k;break}}});pts.push({x:cx+ux*rr,y:cy+uy*rr})}
+  return clipY(pts,cy-.08*r,false)}
  if(g.type==='skirt'){const ww=r*.62*d.w*1.1,wy=cy-.05*r,hy=wy+r*(.3+.9*p.len)*d.h,hw=ww*(1.05+p.flare*.9),o=[{x:cx-ww,y:wy},{x:cx+ww,y:wy}];
   qbez({x:cx+ww,y:wy},{x:cx+ww*1.05,y:(wy+hy)/2},{x:cx+hw,y:hy},14,o);qbez({x:cx+hw,y:hy},{x:cx,y:hy+r*.14},{x:cx-hw,y:hy},18,o);qbez({x:cx-hw,y:hy},{x:cx-ww*1.05,y:(wy+hy)/2},{x:cx-ww,y:wy},14,o);return o}
  const ty=cy-r*.45,tw=r*.3*d.w,by=cy+r*(.35+.9*p.len)*d.h,bw=r*(.85+.6*p.width)*d.w,o=[{x:cx-tw,y:ty},{x:cx+tw,y:ty}];
@@ -1060,7 +1066,7 @@ const ACT={
  toLayout(){setStep('layout')},
  bolt(i){S.layout.cur=+i;S.layout.sel=-1;renderControls()},
  rot(){const L=S.layout;if(L.sel<0)return;const u=L.units[L.sel];u.rot=(u.rot+1)%4;SFX.pop();layoutCheck();renderControls()},
- toCut(){commitLayout();setStep('cut')},
+ toCut(){if(S.order.free&&S.layout.check.cost>meta.coins)return;commitLayout();setStep('cut')},
  recut(){resetCut();renderControls()},
  nextPiece(){S.cut.which++;resetCut();renderControls()},
  toSew(){setStep('sew')},
@@ -1158,7 +1164,7 @@ function renderControls(){
   case'layout':{const L=S.layout,ch=L.check;
    h+=`<div class="chips" style="margin-bottom:6px">${L.bolts.map((b,i)=>chip(i===L.cur,'bolt',i,`<b><i class="sw" style="background:${b.color.hex}"></i>布捲 ${i+1}：${b.mat.name}・${b.color.name} ${ch.bInfo[i].valid?'<span class="y">✔</span>':''}</b><small>${b.units.map(u=>L.units[u].name).join('、')}</small>`)).join('')}</div>
    <div class="row"><button class="btn" data-act="rot" ${L.sel>=0?'':'disabled'}>↻ 旋轉選取的布片（<kbd>R</kbd> 或右鍵）</button>
-   <button class="btn main" data-act="toCut" ${ch.valid?'':'disabled'}>確定排版，買布 $${ch.cost} →</button></div>`;break}
+   ${S.order.free&&ch.cost>meta.coins?`<button class="btn main" disabled>錢不夠（需要 $${ch.cost}，你有 $${meta.coins}）</button><span class="tips">先接幾張訂單賺錢，或換便宜的布、排緊一點。</span>`:`<button class="btn main" data-act="toCut" ${ch.valid?'':'disabled'}>確定排版，買布 $${ch.cost} →</button>`}</div>`;break}
   case'cut':{const c=S.cut,last=c.which>=c.order.length-1;h+=`<div class="row">${c.done?(last?'<button class="btn main" data-act="toSew">下一步：車縫 →</button>':`<button class="btn main" data-act="nextPiece">剪下一塊：${S.layout.units[c.order[c.which+1]].name} →</button>`):''}<button class="btn" data-act="recut">重剪這一塊</button></div>`;break}
   case'sew':{const sw=SW(),lastSeam=S.sew.cur>=S.sew.list.length-1;
    h+=sw.phase==='pin'?`<div class="row"><button class="btn main" data-act="startSew">珠針放好了，開始車縫 →</button></div>`
