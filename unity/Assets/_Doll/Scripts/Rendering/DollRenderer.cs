@@ -45,6 +45,7 @@ namespace DollWorkshop
             var bf = s.FabOf("body");
             var hg = s.GetHair();
             var hf = s.FabOf("hair");
+            bool fx = s.regs != null;
             if (hg != null)
             {
                 if (hg.back != null) DrawPoly(hg.back, hf, 1, false, .35f, false);
@@ -54,25 +55,102 @@ namespace DollWorkshop
             for (int i = 0; i < mains.Count; i++)
             {
                 var m = mains[i]; int baseOrder = 10 + i * 10;
-                foreach (var k in s.ActiveParts("back").Where(k => s.HostOf(k) == m.id)) DrawPartPair(k, baseOrder);
+                foreach (var k in s.ActiveParts("back").Where(k => s.HostOf(k) == m.id)) DrawPartPair(k, baseOrder, fx);
                 var outline = s.MainOutline(m);
                 bool hl = (highlight == "body" && m.id != "head") || (highlight == "head" && m.id == "head");
-                DrawPoly(outline, bf, baseOrder + 3, true, .55f, hl, new Vector2(m.cx, m.cy));
-                DrawGloss(new Vector2(m.cx, m.cy), m.r, bf.mat, baseOrder + 4);
+                float puff = Mathf.Min(1, s.MainFill(m.id));
+                DrawPoly(outline, bf, baseOrder + 3, true, puff, hl, new Vector2(m.cx, m.cy));
+                DrawGloss(new Vector2(m.cx, m.cy), m.r, bf.mat, baseOrder + 4, puff);
                 if (m.id == "body" && !s.parts["belly"].IsNone)
                     DrawPoly(s.BellyPoly(), s.FabOf("belly"), baseOrder + 5, true, .3f, highlight == "belly");
+                foreach (var st in s.stains.Where(x => x.mid == m.id)) { var p = s.ToDoll(m, st.dx, st.dy); mb.Stain(p.x, p.y, 1.6f * m.r / SM.R); }
+                DrawStitches(m);
+                if (fx) MainFX(m);
+                Emit(baseOrder + 6);
             }
             if (hg != null) DrawPoly(hg.cap, hf, 40, false, .35f, highlight == "hair");
-            foreach (var k in s.ActiveParts("front")) DrawPartPair(k, 50);
+            foreach (var k in s.ActiveParts("front")) DrawPartPair(k, 50, fx);
         }
 
-        void DrawPartPair(string k, int order)
+        void DrawPartPair(string k, int order, bool fx)
         {
             var s = state; var o = s.parts[k];
             foreach (int side in new[] { -1, 1 })
             {
-                DrawPoly(s.PartPoly(k, side), s.FabOf(k), order, true, o.nostuff ? .5f : .55f, highlight == k);
-                if (o.inner) DrawPoly(s.InnerPoly(k, side), s.FabOf("earInner"), order + 1, true, .55f, highlight == "earInner");
+                float fill = s.PartFill(k, side), puff = Mathf.Min(1, fill);
+                var P = s.PartPoly(k, side);
+                DrawPoly(P, s.FabOf(k), order, true, puff, highlight == k);
+                if (o.inner) DrawPoly(s.InnerPoly(k, side), s.FabOf("earInner"), order + 1, true, puff, highlight == "earInner");
+                if (fx && !o.nostuff)
+                {
+                    var X = s.PartXform(k, side); var c = SM.Centroid(P);
+                    var ax = SM.RotV(0, -1, X.rot); var nx = new Vector2(-ax.y, ax.x);
+                    if (fill < .28f) foreach (int sg in new[] { -1, 1 }) mb.Seg(c + nx * sg * 5 - ax * 10, c + nx * sg * 3 + ax * 10, 1.5f, Flat);
+                    if (fill > 1.05f) foreach (int sg in new[] { -1, 1 }) mb.Seg(c + nx * sg * 14, c + nx * sg * 22, 2, Strain);
+                }
+            }
+            Emit(order + 2);
+        }
+
+        // ---------- 縫線、污漬、棉花的痕跡 ----------
+        readonly MeshBuilder mb = new MeshBuilder();
+        static readonly Color Flat = new Color(.27f, .16f, .12f, .3f), Strain = new Color(.82f, .33f, .29f, .7f);
+
+        void Emit(int order)
+        {
+            if (mb.v.Count == 0) return;
+            var pc = Next(); mb.Upload(pc.mesh); mb.Clear();
+            pc.mr.sharedMaterial = FabricTextures.Plain;
+            pc.mr.sortingOrder = order * 3;
+            pc.line.positionCount = 0;
+        }
+
+        public static Color ThreadColor(Color h)
+        {
+            float lum = .299f * h.r + .587f * h.g + .114f * h.b;
+            return lum > .55f ? new Color(h.r * .45f, h.g * .45f, h.b * .45f, 1) : new Color(1f, .953f, .878f, 1);
+        }
+
+        void DrawStitches(MainPiece m)
+        {
+            var s = state; var sw = s.seams.FirstOrDefault(x => x.mid == m.id); if (sw == null) return;
+            var st = sw.stitches.Where(x => !x.bad).Select(x => s.ToDoll(m, x.dx, x.dy)).ToList(); if (st.Count < 2) return;
+            var col = ThreadColor(s.FabOf("body").color.color);
+            for (int i = 0; i < st.Count - 1; i++) { if ((i / 3) % 2 == 1) continue; mb.Seg(st[i], st[i + 1], 2.2f, col); }
+            if (sw.backStart) mb.Line(st.Take(Mathf.Min(8, st.Count)).ToList(), 3.2f, col);
+            if (sw.backEnd) mb.Line(st.Skip(Mathf.Max(0, st.Count - 8)).ToList(), 3.2f, col);
+        }
+
+        void MainFX(MainPiece m)
+        {
+            var s = state; var b = s.MainReg(m.id); if (b == null) return; float r = m.r;
+            var bumps = s.regs.Where(x => x.main == m.id && x.bump != null).ToList();
+            Vector2 Edge(float t, float k) => s.ToDoll(m, Mathf.Cos(t) * r * SM.ShapeR(m.sh, t) * k, Mathf.Sin(t) * r * SM.ShapeR(m.sh, t) * k);
+            if (b.fill < .28f)
+                foreach (float dy in new[] { -.25f, .05f, .32f })
+                {
+                    var a = new Vector2(m.cx - .32f * r, m.cy + dy * r); var c = new Vector2(m.cx, m.cy + dy * r + 8); var e = new Vector2(m.cx + .32f * r, m.cy + dy * r);
+                    var P = new List<Vector2>(); for (int i = 0; i <= 10; i++) { float u = i / 10f, w = 1 - u; P.Add(w * w * a + 2 * w * u * c + u * u * e); }
+                    mb.Line(P, 1.6f, Flat);
+                }
+            if (b.lump > .12f)
+                foreach (var (rr, t) in new[] { (.45f, -.6f), (.5f, .9f), (.35f, 2.2f), (.5f, 3.6f), (.4f, 5f) })
+                {
+                    var p = Edge(t, rr); float sz = (10 + b.lump * 10) * r / SM.R;
+                    mb.Blob(p, sz, new Color(.24f, .12f, .08f, 0), new Color(.24f, .12f, .08f, .22f * b.lump), 16);
+                    mb.Blob(p - new Vector2(.3f, .3f) * sz, sz * .55f, new Color(1, 1, 1, .25f * b.lump), new Color(1, 1, 1, 0), 16);
+                }
+            void StrainAt(float t) { var q = Edge(t, 1); var d = (q - new Vector2(m.cx, m.cy)).normalized; mb.Seg(q + d * 4, q + d * 12, 2, Strain); }
+            if (b.fill > 1.05f) foreach (float t in new[] { 0f, 1.2f, 2.4f, 3.6f, 4.8f }) StrainAt(t);
+            foreach (var g in bumps)
+            {
+                float t = g.bump.Value.deg * SM.D;
+                if (g.fill > 1.05f) StrainAt(t);
+                if (g.fill < .28f)
+                {
+                    var p = Edge(t, .78f); var ax = new Vector2(Mathf.Cos(t), Mathf.Sin(t)); var nx = new Vector2(-ax.y, ax.x);
+                    foreach (int sg in new[] { -1, 1 }) mb.Seg(p + nx * sg * 5 - ax * 8, p + nx * sg * 3 + ax * 8, 1.5f, Flat);
+                }
             }
         }
 
@@ -105,7 +183,7 @@ namespace DollWorkshop
             var c = centerOverride ?? SM.Centroid(P);
             float edgeK = 1f - (.06f + .34f * puff) * .6f;
             var verts = new List<Vector3>(); var uvs = new List<Vector2>(); var cols = new List<Color>(); var tris = new List<int>();
-            void Add(Vector2 p, float k) { verts.Add(W(p)); uvs.Add(new Vector2(p.x / 48f, -p.y / 48f)); cols.Add(new Color(k, k, k, 1)); }
+            void Add(Vector2 p, float k) { verts.Add(W(p)); uvs.Add(new Vector2(p.x / 48f, -p.y / 48f)); cols.Add(FabricTextures.Lin(new Color(k, k, k, 1))); }
             if (star)
             {
                 int n = P.Count;
@@ -136,7 +214,7 @@ namespace DollWorkshop
 
             var line = pc.line;
             var lc = hl ? Accent : f.color.color * .62f; lc.a = 1;
-            line.startColor = line.endColor = lc;
+            line.startColor = line.endColor = FabricTextures.Lin(lc);
             line.widthMultiplier = hl ? .045f : .028f;
             line.positionCount = P.Count;
             line.SetPositions(P.Select(W).ToArray());
@@ -144,10 +222,10 @@ namespace DollWorkshop
         }
 
         /// <summary>主體左上方的柔和光澤（白色、透明度往外遞減）。搪膠特別亮。</summary>
-        void DrawGloss(Vector2 center, float r, MatDef mat, int order)
+        void DrawGloss(Vector2 center, float r, MatDef mat, int order, float puff = .55f)
         {
             if (mat == null) return;
-            float a = Mathf.Clamp01(.05f + .16f * .55f * mat.gloss);
+            float a = Mathf.Clamp01(.05f + .16f * puff * mat.gloss);
             var pc = Next(); var mesh = pc.mesh; mesh.Clear();
             var hc = center + new Vector2(-.26f * r, -.32f * r);
             r *= .7f; // 光澤收在主體內側，不要超出輪廓
@@ -166,7 +244,7 @@ namespace DollWorkshop
         }
 
         /// <summary>簡單多邊形的耳切三角化（瀏海這類不是星形的形狀用）。</summary>
-        static List<int> Triangulate(List<Vector2> P)
+        internal static List<int> Triangulate(IList<Vector2> P)
         {
             var res = new List<int>(); int n = P.Count; if (n < 3) return res;
             float area = 0; for (int i = 0, j = n - 1; i < n; j = i++) area += P[j].x * P[i].y - P[i].x * P[j].y;

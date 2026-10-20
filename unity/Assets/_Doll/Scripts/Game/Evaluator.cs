@@ -54,10 +54,6 @@ namespace DollWorkshop
         static string NeedText(Need n) =>
             n.max != null && n.min == null ? $"不要太「{n.tag}」" : n.max != null ? $"「{n.tag}」但不要太過" : $"「{n.tag}」";
 
-        public static bool HasExtremities(DollState d) => d.IsHuman || d.ActiveParts().Any(k => !d.parts[k].nostuff);
-
-        public static float OverallSoft(Session ss) => HasExtremities(ss.doll) ? .65f * ss.bodyFill + .35f * ss.partFill : ss.bodyFill;
-
         public static string SoftLabel(float p) => p < .3f ? "扁塌塌" : p < .7f ? "軟綿綿" : p < .95f ? "飽滿" : p <= 1.05f ? "硬挺" : "快撐破了";
 
         public static Result Evaluate(Session ss)
@@ -78,24 +74,33 @@ namespace DollWorkshop
             r.tagS = reqS.Count > 0 ? reqS.Average() : 1;
 
             var (label, lo, hi) = Orders.Soft[o.soft];
-            float p = OverallSoft(ss);
+            var regs = d.regs ?? new List<StuffRegion>();
+            float p = d.OverallSoft();
             r.softS = p >= lo && p <= hi ? 1 : Mathf.Max(0, 1 - Mathf.Min(Mathf.Abs(p - lo), Mathf.Abs(p - hi)) * 3);
             r.review.Add(($"柔軟度：{label}", p >= lo && p <= hi));
             if (p < lo) r.comments.Add("有點扁，抱起來沒什麼感覺。");
             else if (p > hi) r.comments.Add(p > 1.05f ? "縫線好像快被撐開了……" : "比我想的還要硬耶。");
-            if (!d.IsHard && HasExtremities(d) && ss.partFill < .3f) { r.softS = Mathf.Max(0, r.softS - .12f); r.comments.Add("手腳和耳朵扁扁的，好像沒塞到棉花。"); }
-            if (ss.lump > .3f) r.comments.Add("摸起來凹凸不平的。");
+            var small = regs.Where(x => x.small).ToList();
+            foreach (var x in small) if (x.fill < .3f) { r.softS = Mathf.Max(0, r.softS - .12f); r.comments.Add($"{x.name}扁扁的，好像沒塞到棉花。"); }
+            foreach (var g in small.GroupBy(x => x.name.Substring(1)))
+            {
+                var f = g.Select(x => x.fill).ToList();
+                if (f.Count == 2 && Mathf.Abs(f[0] - f[1]) > .35f) r.comments.Add($"兩邊的{g.Key}一大一小耶。");
+            }
+            var mainR = regs.Where(x => x.IsMainBody).ToList();
+            float lumpAvg = mainR.Count > 0 ? mainR.Average(x => x.lump) : 0;
+            if (lumpAvg > .3f) r.comments.Add("摸起來凹凸不平的。");
 
             float craft;
             if (d.IsHard) craft = ss.hardAccs.Count > 0 ? ss.hardAccs.Values.Average() : .8f;
-            else
-            {
-                craft = (ss.cutAcc + ss.sewAcc) / 2f * (1 - .35f * ss.lump);
-                if (!ss.backOk) { craft -= .08f; r.comments.Add("線頭鬆鬆的，會不會散開啊？"); }
-                if (ss.bodyFill > 1.05f || ss.partFill > 1.05f) craft *= .8f;
-            }
+            else craft = (ss.cutAcc + ss.SewAcc) / 2f * (1 - .35f * lumpAvg);
+            if (ss.offGrain > 0) { craft -= Mathf.Min(.3f, ss.offGrain * .06f); r.comments.Add("有些布片的布紋方向不對，摸起來怪怪的。"); }
+            if (d.stains.Count > 0) { craft -= d.stains.Count * .12f; r.comments.Add("這裡怎麼有一塊污漬？"); }
+            else if (ss.otherFlaws > 0) { craft -= .05f; r.comments.Add("有個地方好像有點髒。"); }
+            if (!ss.BackOk) { craft -= .08f; r.comments.Add(ss.leaked ? "縫線開頭鬆了，棉花一直跑出來。" : "線頭鬆鬆的，會不會散開啊？"); }
+            if (regs.Any(x => x.fill > 1.05f)) craft *= .8f;
             r.craft = Mathf.Clamp01(craft);
-            if (r.craft < .55f) r.comments.Add("做得有點粗糙。");
+            if (r.craft < .55f) r.comments.Add(d.IsHard ? "做得有點粗糙。" : "縫得有點粗糙。");
 
             r.cost = ss.Cost();
             bool over = r.cost > o.budget;

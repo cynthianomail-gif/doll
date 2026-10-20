@@ -98,7 +98,7 @@ namespace DollWorkshop
             var t = p - dragOffset;
             float phi = Mathf.Atan2(t.y - host.cy, t.x - host.cx);
             float a = Mathf.Clamp(SM.AngDiff(phi, -Mathf.PI / 2) / SM.D * dragSide, 0, 180);
-            float rEdge = host.r * SM.ShapeR(host.sh, phi) * DollState.PreviewK;
+            float rEdge = host.r * SM.ShapeR(host.sh, phi) * S.RadiusScale(host, phi);
             float inset = Mathf.Clamp(1 - Vector2.Distance(t, new Vector2(host.cx, host.cy)) / rEdge, -.3f, .45f);
             S.SetAdj(dragKey, dragSide, q => { q.a = a; q.inset = inset; });
         }

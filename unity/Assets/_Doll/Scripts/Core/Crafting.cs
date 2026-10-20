@@ -1,0 +1,41 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace DollWorkshop
+{
+    /// <summary>可以分開塞棉花的部位：主體、主體上有名字的凸起（人形的手腳）、左右的部件。</summary>
+    public class StuffRegion
+    {
+        public string name, main, part, host;
+        public Bump? bump;
+        public int side;
+        public float fill, lump;
+        /// <summary>early：要在主體塞滿之前先塞（不然棉花推不過去）；small：只塞得進小團。</summary>
+        public bool early, small;
+        public bool IsMainBody => main != null && bump == null;
+    }
+
+    public class SeamPoint { public Vector2 p; public float t, lim = .8f; public bool part; }
+    public class Stitch { public float dx, dy, q; public bool bad; }
+    public class Pin { public int i; public bool pulled; }
+
+    /// <summary>一個主體的縫線（開口處不車）。車好的針腳存成相對主體中心的位移，塞棉花後會跟著鼓起來。</summary>
+    public class Seam
+    {
+        public string mid, name;
+        public float cx, cy;
+        public bool sewing;               // false = 放珠針階段
+        public readonly List<Pin> pins = new List<Pin>();
+        public List<SeamPoint> path = new List<SeamPoint>();
+        public int idx;
+        public readonly List<Stitch> stitches = new List<Stitch>();
+        public int jams, pinHits;
+        public float drift, jamUntil;
+        public bool done, backStart, backEnd;
+        public float acc;
+        public bool BackOk => backStart && backEnd;
+    }
+
+    /// <summary>排版時布片壓到的污漬，會留在娃娃身上。</summary>
+    public class Stain { public string mid; public float dx, dy; }
+}

@@ -59,8 +59,16 @@ namespace DollWorkshop
         public ShapeDef dBody, dHead, dTorso;
         public float rH, HY, BY;
 
-        /// <summary>設計畫面預覽時，主體都當作塞了 55% 的棉花。</summary>
-        public const float PreviewK = 1f + .07f * .55f;
+        /// <summary>還沒開始塞棉花時，各部位當作塞了多少（設計畫面預覽 55%；離開設計、開始做布偶後是 0，扁扁的布）。</summary>
+        public float previewFill = .55f;
+
+        // 製作過程留下的結果
+        /// <summary>塞棉花的部位；null = 還沒開始塞。</summary>
+        public List<StuffRegion> regs;
+        public readonly List<Seam> seams = new List<Seam>();
+        public readonly List<Stain> stains = new List<Stain>();
+        /// <summary>揉棉花時的晃動（0–1）與動畫時間（毫秒）。</summary>
+        public float squish, squishTime;
 
         /// <summary>每次修改都 +1，渲染器用它判斷要不要重畫。</summary>
         public int version;
@@ -137,9 +145,111 @@ namespace DollWorkshop
         public MainPiece GetMain(string id) => Mains().FirstOrDefault(m => m.id == id);
         public string HostOf(string key) => IsHuman ? "head" : "body";
 
-        public List<Vector2> MainOutline(MainPiece m, int n = 200) => SM.Outline(m.sh, m.r / SM.R, n, m.cx, m.cy, PreviewK);
+        // ---------- 棉花讓外形鼓起來 ----------
+        /// <summary>主體在角度 t 方向的放大倍率：塞越多越鼓，凹凸不平時輪廓會起伏，揉的時候會晃。</summary>
+        public float RadiusScale(MainPiece m, float t)
+        {
+            float f, l = 0;
+            StuffRegion b = null; float ws = 0, fs = 0;
+            if (regs != null)
+                foreach (var r in regs)
+                {
+                    if (r.main != m.id) continue;
+                    if (r.bump == null) { b = r; continue; }
+                    float w = SM.BumpProf(r.bump.Value, t); ws += w; fs += w * r.fill;
+                }
+            if (b == null) f = previewFill;
+            else { if (ws > 1) { fs /= ws; ws = 1; } f = (1 - ws) * b.fill + fs; l = b.lump * (1 - ws); }
+            float nz = Mathf.Sin(5 * t + 1.3f) * .6f + Mathf.Sin(9 * t + 2.1f) * .4f + Mathf.Sin(14 * t + .4f) * .3f;
+            return (1 + .07f * f) * (1 + l * .045f * nz) * (1 + squish * .025f * Mathf.Sin(t * 3 + squishTime / 50f));
+        }
 
-        public Vector2 ToDoll(MainPiece m, float dx, float dy) => new Vector2(m.cx + dx * PreviewK, m.cy + dy * PreviewK);
+        public float MainFill(string mid)
+        {
+            if (regs != null) foreach (var r in regs) if (r.main == mid && r.bump == null) return r.fill;
+            return previewFill;
+        }
+
+        public StuffRegion MainReg(string mid) => regs?.FirstOrDefault(r => r.main == mid && r.bump == null);
+
+        public float PartFill(string key, int side)
+        {
+            if (parts[key].nostuff) return .5f;
+            if (regs != null) { var g = regs.FirstOrDefault(x => x.part == key && x.side == side); return g != null ? g.fill : 0; }
+            return previewFill;
+        }
+
+        public List<Vector2> MainOutline(MainPiece m, int n = 200, float k = 1f)
+        {
+            var L = new List<Vector2>(n);
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)n * 2 * Mathf.PI, r = m.r * k * SM.ShapeR(m.sh, t) * RadiusScale(m, t);
+                L.Add(new Vector2(m.cx + Mathf.Cos(t) * r, m.cy + Mathf.Sin(t) * r));
+            }
+            return L;
+        }
+
+        public Vector2 ToDoll(MainPiece m, float dx, float dy)
+        {
+            float k = RadiusScale(m, Mathf.Atan2(dy, dx));
+            return new Vector2(m.cx + dx * k, m.cy + dy * k);
+        }
+
+        /// <summary>塞棉花的部位（和網頁版 regionsFor 一樣的順序）。</summary>
+        public List<StuffRegion> RegionsFor()
+        {
+            var list = new List<StuffRegion>();
+            foreach (var m in Mains())
+            {
+                list.Add(new StuffRegion { name = m.name, main = m.id });
+                foreach (var b in m.sh.bumps)
+                    if (!string.IsNullOrEmpty(b.name))
+                        list.Add(new StuffRegion { name = b.name, main = m.id, bump = b, early = Mathf.Abs(SM.AngDiff(b.deg * SM.D, m.gap * SM.D)) > 60 * SM.D, small = true });
+            }
+            foreach (var k in ActiveParts())
+            {
+                var o = parts[k]; if (o.nostuff) continue;
+                foreach (int s in new[] { -1, 1 })
+                    list.Add(new StuffRegion { name = (s < 0 ? "左" : "右") + o.rname, part = k, side = s, host = HostOf(k), early = k != "feet", small = true });
+            }
+            return list;
+        }
+
+        /// <summary>畫面上這一點是哪個塞棉花的部位（-1 = 沒有）。</summary>
+        public int RegionAt(Vector2 p)
+        {
+            if (regs == null) return -1;
+            for (int i = regs.Count - 1; i >= 0; i--) { var r = regs[i]; if (r.part != null && SM.Pip(PartPoly(r.part, r.side), p)) return i; }
+            foreach (var m in Enumerable.Reverse(Mains()))
+            {
+                if (!SM.Pip(MainOutline(m, 120), p)) continue;
+                float t = Mathf.Atan2(p.y - m.cy, p.x - m.cx);
+                float rr = Vector2.Distance(p, new Vector2(m.cx, m.cy)) / (m.r * SM.ShapeR(m.sh, t) * RadiusScale(m, t));
+                int bi = -1; float bw = 0;
+                for (int i = 0; i < regs.Count; i++)
+                    if (regs[i].main == m.id && regs[i].bump != null) { float w = SM.BumpProf(regs[i].bump.Value, t); if (w > bw) { bw = w; bi = i; } }
+                if (bi >= 0 && bw > .3f && rr > .45f) return bi;
+                return regs.IndexOf(MainReg(m.id));
+            }
+            return -1;
+        }
+
+        /// <summary>塞棉花的開口：動物在身體下方，人形在頭的下方（頭和身體最後縫在一起）。</summary>
+        public Vector2 OpeningPos()
+        {
+            if (IsHuman) { var h = GetMain("head"); return ToDoll(h, 0, h.r * SM.ShapeR(h.sh, Mathf.PI / 2) * .97f); }
+            var m = GetMain("body"); return ToDoll(m, 0, m.r * SM.ShapeR(m.sh, Mathf.PI / 2) * .9f);
+        }
+
+        /// <summary>整隻娃娃的軟硬：主體占 65%、手腳耳朵占 35%（沒有的話只看主體）。</summary>
+        public float OverallSoft()
+        {
+            if (regs == null) return 0;
+            var mainR = regs.Where(x => x.IsMainBody).ToList(); var ext = regs.Where(x => !x.IsMainBody).ToList();
+            float a = mainR.Count > 0 ? mainR.Average(x => x.fill) : 0;
+            return ext.Count > 0 ? .65f * a + .35f * ext.Average(x => x.fill) : a;
+        }
 
         // ---------- 部件與位置 ----------
         public IEnumerable<string> ActiveParts(string layer = null) =>
@@ -176,7 +286,7 @@ namespace DollWorkshop
         {
             var o = parts[key]; var q = AdjOf(key, side); var m = GetMain(HostOf(key));
             float th = (-90 + side * q.a) * SM.D;
-            float r = m.r * SM.ShapeR(m.sh, th) * PreviewK * (1 - q.inset);
+            float r = m.r * SM.ShapeR(m.sh, th) * RadiusScale(m, th) * (1 - q.inset);
             return new Xform
             {
                 pos = new Vector2(m.cx + Mathf.Cos(th) * r, m.cy + Mathf.Sin(th) * r),
@@ -194,15 +304,15 @@ namespace DollWorkshop
             return o;
         }
 
-        float PartExtra(string key) => 1 + (parts[key].nostuff ? 0 : .12f * .55f);
+        float PartExtra(string key, int side) => 1 + (parts[key].nostuff ? 0 : .12f * PartFill(key, side));
 
-        public List<Vector2> PartPoly(string key, int side) => XformPoly(parts[key].P, key, side, PartExtra(key));
+        public List<Vector2> PartPoly(string key, int side) => XformPoly(parts[key].P, key, side, PartExtra(key, side));
 
         public List<Vector2> InnerPoly(string key, int side)
         {
             var P = parts[key].P; var c = SM.Centroid(P);
             var inner = P.Select(p => new Vector2(c.x + (p.x - c.x) * .56f, c.y + (p.y - c.y) * .62f)).ToList();
-            return XformPoly(inner, key, side, PartExtra(key));
+            return XformPoly(inner, key, side, PartExtra(key, side));
         }
 
         public List<Vector2> BellyPoly()
@@ -217,7 +327,7 @@ namespace DollWorkshop
             var h = hair;
             if (!IsHuman || h == null || h.id == "none") return null;
             var m = GetMain("head"); float r = m.r;
-            Vector2 At(float t, float k) { float rr = r * SM.ShapeR(m.sh, t) * PreviewK * k; return new Vector2(m.cx + Mathf.Cos(t) * rr, m.cy + Mathf.Sin(t) * rr); }
+            Vector2 At(float t, float k) { float rr = r * SM.ShapeR(m.sh, t) * RadiusScale(m, t) * k; return new Vector2(m.cx + Mathf.Cos(t) * rr, m.cy + Mathf.Sin(t) * rr); }
             float t0 = (180 - h.side) * SM.D, t1 = (360 + h.side) * SM.D;
             var cap = new List<Vector2>();
             for (int i = 0; i <= 48; i++) { float t = t0 + (t1 - t0) * i / 48f; cap.Add(At(t, 1.08f + (h.fluff > 0 ? h.fluff * Mathf.Abs(Mathf.Sin(t * 9)) : 0))); }

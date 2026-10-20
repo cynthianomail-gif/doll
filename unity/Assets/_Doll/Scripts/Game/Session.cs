@@ -11,6 +11,8 @@ namespace DollWorkshop
     {
         public int coins = 100, rep, done;
         public bool tutDone;
+        /// <summary>看過（按了「知道了」）的步驟提示。</summary>
+        public readonly HashSet<Step> tipsSeen = new HashSet<Step>();
         readonly Queue<int> queue = new Queue<int>();
 
         public OrderDef NextOrder()
@@ -47,10 +49,18 @@ namespace DollWorkshop
         public int fabricCost;
         public readonly List<string> decor = new List<string>();
 
-        // 製作結果（暫代值；小遊戲移植後由小遊戲寫入）
-        public float cutAcc = .8f, sewAcc = .8f;
-        public bool backOk = true;
-        public float bodyFill = .6f, partFill = .6f, lump;
+        // 目前步驟的小遊戲（排版、裁布、車縫、塞棉花；其他步驟還是暫代面板時為 null）
+        public CraftGame craft;
+        public LayoutGame layout;
+
+        // 布偶製作結果（由小遊戲寫入）
+        public float cutAcc;
+        public int offGrain, otherFlaws;
+        public bool leaked;
+        public float SewAcc => doll.seams.Count > 0 ? doll.seams.Average(s => s.acc) : 0;
+        public bool BackOk => doll.seams.All(s => s.BackOk);
+
+        // 硬材質（M6 移植前的暫代值）
         public readonly Dictionary<string, float> hardAccs = new Dictionary<string, float>();
         public float vinylThickness = .5f;
 
@@ -76,7 +86,9 @@ namespace DollWorkshop
         {
             why = null;
             if (step == Step.Design && !doll.DesignReady) { why = "先選身體的布料和顏色。"; return false; }
-            if (step == Step.Layout && order.free && fabricCost > meta.coins) { why = $"錢不夠買布（需要 ${fabricCost}）。"; return false; }
+            if (step == Step.Layout && !layout.Valid) { why = "布片還沒排好（要全部放在布上、不能重疊）。"; return false; }
+            if (step == Step.Layout && order.free && layout.Cost > meta.coins) { why = $"錢不夠買布（需要 ${layout.Cost}）。"; return false; }
+            if (craft != null && !craft.Done) { why = "這一步還沒做完。"; return false; }
             return step != Step.Deliver;
         }
 
@@ -84,6 +96,7 @@ namespace DollWorkshop
         public void Advance()
         {
             if (!CanAdvance(out _)) return;
+            if (step == Step.Layout) layout.Commit();
             var list = Steps();
             int i = list.IndexOf(step);
             step = list[Mathf.Min(i + 1, list.Count - 1)];
@@ -92,13 +105,18 @@ namespace DollWorkshop
 
         void OnEnter(Step s)
         {
+            craft = null;
             switch (s)
             {
-                case Step.Layout: fabricCost = EstimateFabricCost(); break;
+                case Step.Layout: doll.previewFill = 0; doll.Touch(); craft = layout = new LayoutGame(this); break;
+                case Step.Cut: craft = new CutGame(this, layout); break;
+                case Step.Sew: craft = new SewGame(this); break;
+                case Step.Stuff: craft = new StuffGame(this); break;
                 case Step.Cast:
                 case Step.Saw:
                     fabricCost = (doll.material == "vinyl" ? 30 : 20) + doll.ActiveParts().Count() * 4 + (doll.IsHuman ? 8 : 0);
-                    if (doll.material == "wood") { bodyFill = partFill = 1f; }
+                    doll.regs = doll.RegionsFor();
+                    SetHardFill(doll.material == "wood" ? 1f : .4f + .65f * vinylThickness);
                     break;
                 case Step.Deliver: Deliver(); break;
             }
@@ -107,41 +125,8 @@ namespace DollWorkshop
         public int DecorCost() => decor.Sum(id => DB.DecorById(id)?.cost ?? 0);
         public int Cost() => fabricCost + DecorCost();
 
-        /// <summary>
-        /// 排版小遊戲移植前的布料估價：依每種布的布片面積（含前後片、對折份數）換算布長。
-        /// 網頁版是玩家實際排版、越省布越便宜；這裡假設排得普通（利用率 60%）。
-        /// </summary>
-        public int EstimateFabricCost()
-        {
-            var area = new Dictionary<string, (MatDef mat, float a)>();
-            void Add(string slot, IEnumerable<List<Vector2>> polys, int mult)
-            {
-                var f = doll.FabOf(slot); if (f.mat == null || f.color == null) return;
-                float a = polys.Sum(PolyArea) * mult;
-                string k = f.mat.id + f.color.id;
-                area[k] = area.TryGetValue(k, out var v) ? (v.mat, v.a + a) : (f.mat, a);
-            }
-            Add("body", doll.Mains().Select(m => doll.MainOutline(m, 120)), 2);
-            var hg = doll.GetHair();
-            if (hg != null) { var hp = new List<List<Vector2>> { hg.cap }; if (hg.back != null) hp.Add(hg.back); if (hg.tails != null) hp.AddRange(hg.tails); Add("hair", hp, 1); }
-            foreach (var k in doll.ActiveParts()) Add(k, new[] { doll.PartPoly(k, 1) }, 4);
-            if (doll.parts["ears"].inner && !doll.parts["ears"].IsNone) Add("earInner", new[] { doll.InnerPoly("ears", 1) }, 2);
-            if (!doll.parts["belly"].IsNone) Add("belly", new[] { doll.BellyPoly() }, 1);
-            int cost = 0;
-            foreach (var v in area.Values)
-            {
-                // 布寬 230cm（排版畫面）＝實際 460 像素；1cm = 2 像素
-                float lenCm = v.a / 460f / .6f / 2f;
-                cost += Mathf.CeilToInt(lenCm / 10f) * (int)v.mat.p10;
-            }
-            return cost;
-        }
-
-        static float PolyArea(List<Vector2> P)
-        {
-            float s = 0; for (int i = 0, j = P.Count - 1; i < P.Count; j = i++) s += P[j].x * P[i].y - P[i].x * P[j].y;
-            return Mathf.Abs(s) / 2f;
-        }
+        /// <summary>硬材質的軟硬由外殼厚度決定（木頭是實心的）。</summary>
+        public void SetHardFill(float f) { if (doll.regs == null) return; foreach (var r in doll.regs) r.fill = f; doll.Touch(); }
 
         void Deliver()
         {

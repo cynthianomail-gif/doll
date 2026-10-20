@@ -30,6 +30,9 @@ namespace DollWorkshop
             return m;
         }
 
+        /// <summary>頂點色要轉成線性色彩空間（專案是 Linear），不然畫出來會偏淡。</summary>
+        public static Color Lin(Color c) => QualitySettings.activeColorSpace == ColorSpace.Linear ? c.linear : c;
+
         static Material plain;
         /// <summary>純白材質，用在外框線與光澤（顏色由頂點色決定）。</summary>
         public static Material Plain => plain != null ? plain : (plain = new Material(SpriteShader) { mainTexture = Texture2D.whiteTexture, name = "PlainWhite" });
