@@ -51,6 +51,14 @@ namespace DollWorkshop
         public string[] tags = new string[0];
     }
 
+    public class DecorDef
+    {
+        public string id, name, pos;
+        public int cost;
+        public string[] tags;
+        public DecorDef(string id, string name, int cost, string pos, params string[] tags) { this.id = id; this.name = name; this.cost = cost; this.pos = pos; this.tags = tags; }
+    }
+
     public class SliderDef
     {
         public string key, label;
@@ -166,6 +174,20 @@ namespace DollWorkshop
             ["torso"] = new[] { new SliderDef("w", "胖瘦", .75f, 1.6f, 1), new SliderDef("h", "身高", .75f, 1.4f, 1), new SliderDef("armL", "手長", .3f, 1.1f, .62f), new SliderDef("armW", "手粗", .12f, .32f, .2f),
                                 new SliderDef("armA", "手的角度", -10, 45, 12), new SliderDef("legL", "腿長", .3f, 1.2f, .66f), new SliderDef("legW", "腿粗", .08f, .22f, .13f), new SliderDef("legSp", "腿距", 10, 38, 22) },
         };
+
+        public static readonly List<DecorDef> Decor = new List<DecorDef>
+        {
+            new DecorDef("eyes_button", "鈕扣眼", 15, "eyes", "復古", "手作感"), new DecorDef("eyes_stitch", "刺繡瞇瞇眼", 10, "eyes", "溫柔", "療癒"),
+            new DecorDef("eyes_dot", "豆豆眼", 5, "eyes", "好笑", "可愛"), new DecorDef("eyes_sparkle", "閃亮大眼", 30, "eyes", "可愛", "高級"),
+            new DecorDef("eyes_x", "叉叉眼", 8, "eyes", "酷", "好笑"), new DecorDef("nose", "三角鼻", 5, "nose", "可愛"),
+            new DecorDef("mouth_w", "ω 嘴", 5, "mouth", "可愛", "好笑"), new DecorDef("mouth_smile", "微笑", 5, "mouth", "溫柔"),
+            new DecorDef("mouth_fang", "小尖牙", 8, "mouth", "酷"), new DecorDef("blush", "腮紅", 8, "cheek", "可愛", "溫柔"),
+            new DecorDef("bow", "蝴蝶結", 25, "acc", "可愛", "高級"), new DecorDef("flower", "小花", 15, "acc", "溫柔", "活潑"),
+            new DecorDef("star", "星星補丁", 15, "body", "活潑", "手作感"), new DecorDef("heart", "愛心補丁", 12, "body", "可愛"),
+            new DecorDef("scar", "縫線疤痕", 10, "body", "酷", "手作感"), new DecorDef("pin", "安全別針", 10, "acc", "酷"),
+            new DecorDef("scarf", "格紋圍巾", 30, "neck", "復古", "溫柔"),
+        };
+        public static DecorDef DecorById(string id) => Decor.FirstOrDefault(d => d.id == id);
 
         public static readonly string[] SlotKeys = { "body", "hair", "ears", "earInner", "arms", "feet", "belly" };
         public static readonly Dictionary<string, string> SlotName = new Dictionary<string, string>

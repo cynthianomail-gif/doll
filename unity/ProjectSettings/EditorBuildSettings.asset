@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/_Doll/Scenes/Main.unity
+    guid: 20684f2391d5b194198324393899f06c
+  - enabled: 1
     path: Assets/_Doll/Scenes/Design.unity
     guid: 21c49c0b48a61be4b993fefbe8481037
   m_configObjects:

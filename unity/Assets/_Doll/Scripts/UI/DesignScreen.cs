@@ -31,13 +31,23 @@ namespace DollWorkshop
         static readonly (string id, string label)[] TabsAnimal = { ("body", "身體"), ("ears", "耳朵"), ("earInner", "耳朵內側"), ("arms", "手"), ("feet", "腳"), ("belly", "肚子") };
         static readonly (string id, string label)[] TabsHuman = { ("head", "頭"), ("body", "身體"), ("hair", "頭髮"), ("ears", "屬性耳"), ("earInner", "耳朵內側") };
 
+        /// <summary>由遊戲流程指定：按下「設計好了」時呼叫。沒有指定時（單獨測試設計場景）只顯示提示。</summary>
+        public System.Action onDone;
+        /// <summary>顯示在面板最上方的客人需求摘要。</summary>
+        public string orderBrief;
+        public string doneLabel;
+
         void Start()
         {
             if (cam == null) cam = Camera.main;
             dollRenderer.highlight = tab;
         }
 
-        float PanelW => Mathf.Max(380, Screen.width * PanelFrac);
+        /// <summary>換新的娃娃時，把分頁和捲動位置回到起點。</summary>
+        public void ResetUI() { tab = "body"; scroll = Vector2.zero; adjSide = 1; dragKey = null; }
+
+        public static float PanelWidth => Mathf.Max(380, Screen.width * PanelFrac);
+        float PanelW => PanelWidth;
 
         void Update()
         {
@@ -179,6 +189,7 @@ namespace DollWorkshop
             GUILayout.BeginArea(new Rect(gx, 0, pw, Screen.height), GUI.skin.box);
             scroll = GUILayout.BeginScrollView(scroll);
             GUILayout.Label("🧸 設計娃娃", title);
+            if (!string.IsNullOrEmpty(orderBrief)) GUILayout.Label(orderBrief, small);
 
             GUILayout.Label("材質", h4);
             GUILayout.BeginHorizontal();
@@ -201,8 +212,11 @@ namespace DollWorkshop
 
             GUILayout.Space(14);
             GUI.enabled = S.DesignReady;
-            if (GUILayout.Button(S.IsHard ? "設計好了，開始製作 →（下一個移植項目）" : "設計好了，去排版 →（下一個移植項目）", chipOn, GUILayout.Height(40)))
-                Flash("製作流程還在移植中，目前先做到設計畫面。");
+            if (GUILayout.Button(doneLabel ?? (S.IsHard ? "設計好了，開始製作 →" : "設計好了，去排版 →"), chipOn, GUILayout.Height(40)))
+            {
+                if (onDone != null) onDone();
+                else Flash("這是單獨的設計場景；完整流程請打開 Main 場景。");
+            }
             GUI.enabled = true;
             GUILayout.EndScrollView();
             GUILayout.EndArea();
