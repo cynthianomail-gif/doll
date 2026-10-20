@@ -70,6 +70,8 @@ namespace DollWorkshop
             }
             if (hg != null) DrawPoly(hg.cap, hf, 40, false, .35f, highlight == "hair");
             foreach (var k in s.ActiveParts("front")) DrawPartPair(k, 50, fx);
+            foreach (var it in s.decor) DecorArt.Draw(mb, it);
+            Emit(60);
         }
 
         void DrawPartPair(string k, int order, bool fx)

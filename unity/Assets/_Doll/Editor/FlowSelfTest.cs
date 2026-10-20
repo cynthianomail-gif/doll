@@ -169,7 +169,10 @@ namespace DollWorkshop.EditorTools
             Check(!st.CanClose, "身體太扁不能縫合");
             StuffAll(st, .75f, .8f);
             Check(st.Done, $"塞好並縫合，整體手感：{Evaluator.SoftLabel(ss.doll.OverallSoft())}（{ss.doll.OverallSoft():F2}）");
-            ss.Advance(); ss.Advance();
+            ss.Advance();
+            var dg1 = (DecorGame)ss.craft; dg1.Add("eyes_button"); dg1.Add("mouth_smile"); dg1.Add("blush");
+            Check(ss.step == Step.Decor && ss.Cost() == ss.fabricCost + 28, $"裝飾：加了鈕扣眼、微笑、腮紅（合計 ${ss.Cost()}）");
+            ss.Advance();
             var r1 = ss.result;
             Check(ss.step == Step.Deliver && r1 != null, $"交件：{r1.stars}★，手工 {r1.craft:P0}，柔軟 {r1.softS:P0}");
             Check(r1.comments.Contains("這裡怎麼有一塊污漬？"), "評語提到污漬");
@@ -211,11 +214,41 @@ namespace DollWorkshop.EditorTools
             Check(wood.result.review.Any(r => r.ok && r.text == woodOrder.need.First(n => n.needMat == "wood").label), $"{woodOrder.who}：木頭需求判定符合，{wood.result.stars}★");
             Check(wood.doll.OverallSoft() >= 1, "木頭是硬的");
 
+            // ---------- 裝飾 ----------
             var dec = new Session(meta, Orders.Doll[0]);
             dec.doll.fab["body"] = new Fab(DB.Mat("felt"), DB.Col("cream"));
-            float before = Evaluator.Tally(dec).Values.Sum();
-            dec.decor.Add(DB.Decor[0].id);
-            Check(dec.DecorCost() == DB.Decor[0].cost && Evaluator.Tally(dec).Values.Sum() >= before, "配件計入花費與標籤");
+            var dg = new DecorGame(dec);
+            float before = Evaluator.Tally(dec)["可愛"];
+            var eyes = dg.Add("eyes_sparkle");
+            Check(dec.DecorCost() == 30 && Evaluator.Tally(dec)["可愛"] == before + 1, "閃亮大眼：花費 $30、多一分「可愛」");
+            Check(eyes.Pos == dec.doll.DecorPos("eyes") && eyes.Pos.y < SM.CY, "眼睛加在臉上（身體中心上方）");
+            var eyes2 = dg.Add("eyes_dot");
+            Check(eyes2.x == eyes.x + 12 && eyes2.y == eyes.y + 10, "同一個位置的第二個配件會錯開");
+            var bow = dg.Add("bow");
+            Check(dg.HitAt(bow.Pos + new Vector2(10, 0)) == 2 && dg.HitAt(new Vector2(50, 50)) == -1, "點選範圍判定");
+            dg.Down(bow.Pos + new Vector2(5, 0)); dg.Move(new Vector2(300, 250), bow.Pos); dg.Up(new Vector2(300, 250));
+            Check(Mathf.Abs(bow.x - 295) < .01f && Mathf.Abs(bow.y - 250) < .01f, "拖曳移動配件");
+            for (int i = 0; i < 30; i++) dg.Act("+");
+            Check(Mathf.Approximately(bow.s, 2.6f), "放大有上限");
+            dg.sel = dec.doll.decor.IndexOf(eyes2); dg.Act("del");
+            Check(dec.doll.decor.Count == 2 && !dec.doll.decor.Contains(eyes2) && dec.DecorCost() == 55, "刪除配件，花費跟著扣掉");
+            var hd = new DollState { kind = "human" }; hd.Rebuild();
+            var hm = hd.GetMain("head");
+            Check(Vector2.Distance(hd.DecorPos("eyes"), new Vector2(hm.cx, hm.cy)) < hm.r, "人形娃娃的眼睛在頭上");
+            foreach (var d in DB.Decor) { var mb = new MeshBuilder(); DecorArt.Draw(mb, new DecorItem { type = d.id, x = 400, y = 300 }); if (mb.v.Count == 0) Check(false, $"{d.name} 沒有圖案"); }
+            Check(true, $"{DB.Decor.Count} 種配件都有圖案");
+
+            // ---------- 交件演出 ----------
+            var ds = (DeliverStage)hu.craft;
+            Check(ds != null && ds.DollOffset.x < 0, "交件時娃娃移到左邊的展示台");
+            Check((hu.result.stars >= 4) == (ds.Mood == "happy") && (hu.result.stars >= 4) == (ds.ConfettiCount > 0), $"客人表情：{ds.Mood}，彩紙 {ds.ConfettiCount} 片");
+            foreach (var (stars, mood, conf) in new[] { (1, "sad", false), (2, "sad", false), (3, "ok", false), (4, "happy", true), (5, "happy", true) })
+            {
+                var fake = new Session(meta, Orders.Doll[0]) { result = new Result { stars = stars, line = "…" } };
+                var sd = new DeliverStage(fake);
+                if (sd.Mood != mood || (sd.ConfettiCount > 0) != conf) Check(false, $"{stars}★ 的客人反應不對（{sd.Mood}）");
+            }
+            Check(true, "1–2★ 冒冷汗、3★ 普通、4–5★ 開心＋彩紙");
         }
     }
 }

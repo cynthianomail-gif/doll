@@ -56,6 +56,8 @@ namespace DollWorkshop
         public string id, name, pos;
         public int cost;
         public string[] tags;
+        /// <summary>點選範圍（半徑，畫布像素，會乘上配件縮放）。</summary>
+        public float hit = 20;
         public DecorDef(string id, string name, int cost, string pos, params string[] tags) { this.id = id; this.name = name; this.cost = cost; this.pos = pos; this.tags = tags; }
     }
 
@@ -177,15 +179,15 @@ namespace DollWorkshop
 
         public static readonly List<DecorDef> Decor = new List<DecorDef>
         {
-            new DecorDef("eyes_button", "鈕扣眼", 15, "eyes", "復古", "手作感"), new DecorDef("eyes_stitch", "刺繡瞇瞇眼", 10, "eyes", "溫柔", "療癒"),
-            new DecorDef("eyes_dot", "豆豆眼", 5, "eyes", "好笑", "可愛"), new DecorDef("eyes_sparkle", "閃亮大眼", 30, "eyes", "可愛", "高級"),
-            new DecorDef("eyes_x", "叉叉眼", 8, "eyes", "酷", "好笑"), new DecorDef("nose", "三角鼻", 5, "nose", "可愛"),
-            new DecorDef("mouth_w", "ω 嘴", 5, "mouth", "可愛", "好笑"), new DecorDef("mouth_smile", "微笑", 5, "mouth", "溫柔"),
-            new DecorDef("mouth_fang", "小尖牙", 8, "mouth", "酷"), new DecorDef("blush", "腮紅", 8, "cheek", "可愛", "溫柔"),
-            new DecorDef("bow", "蝴蝶結", 25, "acc", "可愛", "高級"), new DecorDef("flower", "小花", 15, "acc", "溫柔", "活潑"),
-            new DecorDef("star", "星星補丁", 15, "body", "活潑", "手作感"), new DecorDef("heart", "愛心補丁", 12, "body", "可愛"),
-            new DecorDef("scar", "縫線疤痕", 10, "body", "酷", "手作感"), new DecorDef("pin", "安全別針", 10, "acc", "酷"),
-            new DecorDef("scarf", "格紋圍巾", 30, "neck", "復古", "溫柔"),
+            new DecorDef("eyes_button", "鈕扣眼", 15, "eyes", "復古", "手作感") { hit = 40 }, new DecorDef("eyes_stitch", "刺繡瞇瞇眼", 10, "eyes", "溫柔", "療癒") { hit = 40 },
+            new DecorDef("eyes_dot", "豆豆眼", 5, "eyes", "好笑", "可愛") { hit = 38 }, new DecorDef("eyes_sparkle", "閃亮大眼", 30, "eyes", "可愛", "高級") { hit = 42 },
+            new DecorDef("eyes_x", "叉叉眼", 8, "eyes", "酷", "好笑") { hit = 40 }, new DecorDef("nose", "三角鼻", 5, "nose", "可愛") { hit = 14 },
+            new DecorDef("mouth_w", "ω 嘴", 5, "mouth", "可愛", "好笑") { hit = 16 }, new DecorDef("mouth_smile", "微笑", 5, "mouth", "溫柔") { hit = 16 },
+            new DecorDef("mouth_fang", "小尖牙", 8, "mouth", "酷") { hit = 16 }, new DecorDef("blush", "腮紅", 8, "cheek", "可愛", "溫柔") { hit = 56 },
+            new DecorDef("bow", "蝴蝶結", 25, "acc", "可愛", "高級") { hit = 24 }, new DecorDef("flower", "小花", 15, "acc", "溫柔", "活潑") { hit = 18 },
+            new DecorDef("star", "星星補丁", 15, "body", "活潑", "手作感") { hit = 18 }, new DecorDef("heart", "愛心補丁", 12, "body", "可愛") { hit = 16 },
+            new DecorDef("scar", "縫線疤痕", 10, "body", "酷", "手作感") { hit = 22 }, new DecorDef("pin", "安全別針", 10, "acc", "酷") { hit = 20 },
+            new DecorDef("scarf", "格紋圍巾", 30, "neck", "復古", "溫柔") { hit = 50 },
         };
         public static DecorDef DecorById(string id) => Decor.FirstOrDefault(d => d.id == id);
 

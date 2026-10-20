@@ -67,6 +67,7 @@ namespace DollWorkshop
         public List<StuffRegion> regs;
         public readonly List<Seam> seams = new List<Seam>();
         public readonly List<Stain> stains = new List<Stain>();
+        public readonly List<DecorItem> decor = new List<DecorItem>();
         /// <summary>揉棉花時的晃動（0–1）與動畫時間（毫秒）。</summary>
         public float squish, squishTime;
 
@@ -240,6 +241,29 @@ namespace DollWorkshop
         {
             if (IsHuman) { var h = GetMain("head"); return ToDoll(h, 0, h.r * SM.ShapeR(h.sh, Mathf.PI / 2) * .97f); }
             var m = GetMain("body"); return ToDoll(m, 0, m.r * SM.ShapeR(m.sh, Mathf.PI / 2) * .9f);
+        }
+
+        // ---------- 裝飾 ----------
+        static readonly Dictionary<string, (float x, float y)> PosA = new Dictionary<string, (float, float)>
+        { { "eyes", (0, -.22f) }, { "nose", (0, -.04f) }, { "mouth", (0, .1f) }, { "cheek", (0, 0) }, { "acc", (.55f, -.72f) }, { "body", (-.3f, .45f) }, { "neck", (0, .36f) } };
+        static readonly Dictionary<string, (string m, float x, float y)> PosH = new Dictionary<string, (string, float, float)>
+        { { "eyes", ("head", 0, .14f) }, { "nose", ("head", 0, .27f) }, { "mouth", ("head", 0, .38f) }, { "cheek", ("head", 0, .3f) }, { "acc", ("head", .62f, -.55f) }, { "body", ("torso", -.15f, .05f) }, { "neck", ("torso", 0, -.62f) } };
+
+        /// <summary>配件剛加上去時的位置（眼睛在臉上、蝴蝶結在耳邊……）。</summary>
+        public Vector2 DecorPos(string pos)
+        {
+            if (IsHuman) { var (h, x, y) = PosH[pos]; var m = GetMain(h); return new Vector2(m.cx + x * m.r, m.cy + y * m.r); }
+            var (ax, ay) = PosA[pos]; return new Vector2(SM.CX + ax * SM.R, SM.CY + ay * SM.R);
+        }
+
+        /// <summary>整隻娃娃（主體、前面的部件、後髮）的外框，交件時用來擺展示台。</summary>
+        public Rect Bounds()
+        {
+            var pts = new List<Vector2>();
+            foreach (var m in Mains()) pts.AddRange(MainOutline(m, 90));
+            foreach (var k in ActiveParts("front")) foreach (int s in new[] { -1, 1 }) pts.AddRange(PartPoly(k, s));
+            var hg = GetHair(); if (hg?.back != null) pts.AddRange(hg.back);
+            return SM.Bbox(pts);
         }
 
         /// <summary>整隻娃娃的軟硬：主體占 65%、手腳耳朵占 35%（沒有的話只看主體）。</summary>

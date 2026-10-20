@@ -47,7 +47,6 @@ namespace DollWorkshop
 
         // 帳本
         public int fabricCost;
-        public readonly List<string> decor = new List<string>();
 
         // 目前步驟的小遊戲（排版、裁布、車縫、塞棉花；其他步驟還是暫代面板時為 null）
         public CraftGame craft;
@@ -118,11 +117,12 @@ namespace DollWorkshop
                     doll.regs = doll.RegionsFor();
                     SetHardFill(doll.material == "wood" ? 1f : .4f + .65f * vinylThickness);
                     break;
-                case Step.Deliver: Deliver(); break;
+                case Step.Decor: craft = new DecorGame(this); break;
+                case Step.Deliver: Deliver(); craft = new DeliverStage(this); break;
             }
         }
 
-        public int DecorCost() => decor.Sum(id => DB.DecorById(id)?.cost ?? 0);
+        public int DecorCost() => doll.decor.Sum(it => DB.DecorById(it.type)?.cost ?? 0);
         public int Cost() => fabricCost + DecorCost();
 
         /// <summary>硬材質的軟硬由外殼厚度決定（木頭是實心的）。</summary>

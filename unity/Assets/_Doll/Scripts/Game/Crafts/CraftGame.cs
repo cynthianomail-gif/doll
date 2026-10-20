@@ -38,6 +38,8 @@ namespace DollWorkshop
         public virtual bool ShowDoll => true;
         /// <summary>裁布在綠色切割墊上做，其他步驟在工作桌上。</summary>
         public virtual bool CuttingMat => false;
+        /// <summary>娃娃要畫在哪裡（相對原位置的位移，畫布像素）；交件時往左挪，讓出位置給客人。</summary>
+        public virtual Vector2 DollOffset => Vector2.zero;
         /// <summary>隱藏系統游標，改畫剪刀、縫紉機等工具。</summary>
         public virtual bool HideCursor => false;
 

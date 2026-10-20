@@ -38,4 +38,7 @@ namespace DollWorkshop
 
     /// <summary>排版時布片壓到的污漬，會留在娃娃身上。</summary>
     public class Stain { public string mid; public float dx, dy; }
+
+    /// <summary>裝飾步驟加到娃娃上的配件或刺繡五官（位置是畫布像素，rot 是弧度）。</summary>
+    public class DecorItem { public string type; public float x, y, s = 1, rot; public Vector2 Pos => new Vector2(x, y); }
 }

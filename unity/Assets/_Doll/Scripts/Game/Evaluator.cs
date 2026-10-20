@@ -45,7 +45,7 @@ namespace DollWorkshop
                 foreach (var c in fabs.Select(f => f.color).Distinct().Where(c => c != bc)) Add(c.tags, .5f);
                 if (fabs.Select(f => f.mat.id + f.color.id).Distinct().Count() >= 3) Add(new[] { "手作感", "活潑" });
             }
-            foreach (var id in ss.decor) { var dd = DB.DecorById(id); if (dd != null) Add(dd.tags); }
+            foreach (var it in d.decor) { var dd = DB.DecorById(it.type); if (dd != null) Add(dd.tags); }
             return t;
         }
 

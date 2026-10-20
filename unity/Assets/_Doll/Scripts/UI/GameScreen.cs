@@ -36,6 +36,7 @@ namespace DollWorkshop
             { Step.Cut, "按住滑鼠，沿著虛線剪。剪歪的地方會留下紅線，影響手工分數。" },
             { Step.Sew, "先在虛線上點幾下放珠針（橘色段落代表還沒固定）。開始車縫後：按住滑鼠沿虛線走，車速不要超過右邊的紅線；珠針靠近時按空白鍵拔掉；開頭和結尾按住 B 回針。覺得太難可以打開「車縫輔助」。" },
             { Step.Stuff, "在棉花袋上按住，拉出棉花（按越久越大團），拖到要塞的部位放開。耳朵、手腳只能塞小團，而且要在身體塞滿之前先塞。在娃娃上來回揉，可以把凹凸揉平。" },
+            { Step.Decor, "點右邊的配件加到娃娃上，拖曳移動、滾輪縮放，Delete 刪除。眼睛、鼻子、嘴巴都是刺繡的五官。" },
             { Step.Deliver, "交件了！看看客人在意的是什麼，下一位客人的話可以讀得更仔細。" },
         };
 
@@ -86,6 +87,8 @@ namespace DollWorkshop
             if (!design.enabled) cam.rect = new Rect(0, 0, 1 - DesignScreen.PanelWidth / Screen.width, 1);
             var craft = ss.craft;
             dollRenderer.gameObject.SetActive(ss.step != Step.Order && (craft == null || craft.ShowDoll));
+            var off = craft?.DollOffset ?? Vector2.zero;
+            dollRenderer.transform.position = new Vector3(off.x / 100f, -off.y / 100f, 0);
             if (craft != null)
             {
                 craft.ptr = ptr;
@@ -221,6 +224,22 @@ namespace DollWorkshop
             else GUI.Label(r, gc, st);
         }
 
+        /// <summary>對話框：左上角在畫布座標 p、寬 w（畫布像素），高度依文字自動決定，下方有尖角。</summary>
+        public void CanvasBubble(Vector2 p, float w, string text, int size)
+        {
+            var sc = cam.WorldToScreenPoint(DollRenderer.W(p));
+            float k = cam.pixelHeight / (cam.orthographicSize * 200f);
+            var st = new GUIStyle(bubble) { fontSize = Mathf.Max(8, Mathf.RoundToInt(size * k)), padding = new RectOffset((int)(18 * k), (int)(18 * k), (int)(14 * k), (int)(14 * k)) };
+            st.normal.background = pill.normal.background;
+            float wpx = w * k, h = st.CalcHeight(new GUIContent(text), wpx);
+            var r = new Rect(sc.x, Screen.height - sc.y, wpx, h);
+            GUI.Box(r, text, st);
+            var tail = new GUIStyle(lab) { fontSize = Mathf.RoundToInt(22 * k), alignment = TextAnchor.UpperCenter }; tail.normal.textColor = new Color(1, 1, 1, .9f);
+            GUI.Label(new Rect(r.x + r.width * .55f, r.yMax - 6 * k, 30 * k, 30 * k), "▼", tail);
+        }
+
+        public void NextCustomer() => NewOrder();
+
         void Hint(string text) => CanvasLabel(new Vector2(SM.W / 2, 30), text, 16, new Color(.29f, .23f, .2f), TextAnchor.MiddleCenter, true, true);
 
         // ---------- 畫面 ----------
@@ -230,10 +249,9 @@ namespace DollWorkshop
             float pw = DesignScreen.PanelWidth, gx = Screen.width - pw;
             StepBar(gx);
             var craft = ss.craft;
-            if (craft != null) { craft.CanvasGUI(this); Hint(craft.Hint); }
+            if (craft != null) { craft.CanvasGUI(this); if (craft.Hint != null) Hint(craft.Hint); }
             if (Time.time < flashUntil) GUI.Label(new Rect(16, Screen.height - 64, gx - 32, 30), flash, body);
             if (ss.step == Step.Order) DrawCustomer(gx);
-            if (ss.step == Step.Deliver) DrawDeliverStage(gx);
             if (design.enabled) return; // 設計步驟的右側面板由 DesignScreen 負責
 
             GUILayout.BeginArea(new Rect(gx, 0, pw, Screen.height), GUI.skin.box);
@@ -249,8 +267,6 @@ namespace DollWorkshop
                 case Step.Carve: HardPanel("carve", "雕刻", "刮掉外圍多餘的木頭，不要鑿進本體。"); break;
                 case Step.Sand: HardPanel("sand", "砂磨", "先粗砂紙磨平，再細砂紙磨光。"); break;
                 case Step.Paint: PaintPanel(); break;
-                case Step.Decor: DecorPanel(); break;
-                case Step.Deliver: DeliverPanel(); break;
             }
             GUILayout.Space(12);
             OrderCard();
@@ -338,50 +354,6 @@ namespace DollWorkshop
         {
             H2("上色"); Body("在娃娃身上自由手繪、噴漆，木頭可以上亮光漆。"); Placeholder("上色");
             if (MainBtn("先跳過上色 →")) Advance();
-        }
-
-        void DecorPanel()
-        {
-            H2("裝飾");
-            Small("（配件擺放與刺繡五官的繪製在 M4 移植；目前先選要加哪些配件，會計入標籤和花費。）");
-            GUILayout.Label("點一下加入：", h4);
-            var list = DB.Decor;
-            for (int i = 0; i < list.Count; i += 3)
-            {
-                GUILayout.BeginHorizontal();
-                for (int j = i; j < Mathf.Min(list.Count, i + 3); j++)
-                    if (GUILayout.Button($"{list[j].name}  ${list[j].cost}", btn)) ss.decor.Add(list[j].id);
-                GUILayout.EndHorizontal();
-            }
-            if (ss.decor.Count > 0)
-            {
-                GUILayout.Label("已加入（點一下移除）：", h4);
-                for (int i = 0; i < ss.decor.Count; i++)
-                    if (GUILayout.Button("✕ " + DB.DecorById(ss.decor[i]).name, btn)) { ss.decor.RemoveAt(i); break; }
-            }
-            if (MainBtn($"完成，交給{ss.order.who} →")) Advance();
-        }
-
-        void DrawDeliverStage(float gx)
-        {
-            var r = ss.result; if (r == null) return;
-            GUI.Label(new Rect(gx - 300, 60, 280, 40), new string('★', r.stars) + new string('☆', 5 - r.stars), new GUIStyle(h2) { fontSize = 30, alignment = TextAnchor.MiddleRight, normal = { textColor = new Color(.88f, .63f, .13f) } });
-            float h = bubble.CalcHeight(new GUIContent(r.line), 280);
-            GUI.Box(new Rect(gx - 300, 110, 280, h), r.line, bubble);
-        }
-
-        void DeliverPanel()
-        {
-            var r = ss.result; var green = new Color(.42f, .66f, .54f);
-            H2("交件");
-            Small($"交件後才知道：{ss.order.who}在意的是——");
-            foreach (var (text, ok) in r.review) Body($"{(ok ? "✔" : "✘")} {text}");
-            Bar("符合期待", r.tagS, green, $"{Mathf.RoundToInt(r.tagS * 100)}%");
-            Bar("柔軟度", r.softS, green, $"{Mathf.RoundToInt(r.softS * 100)}%");
-            Bar("手工品質", r.craft, green, $"{Mathf.RoundToInt(r.craft * 100)}%");
-            Body($"成本 ${r.cost} ／ 預算 ${ss.order.budget}　收到 ${r.pay}　利潤 {(r.profit >= 0 ? "+" : "")}${r.profit}　聲望 {(r.stars - 3 >= 0 ? "+" : "")}{r.stars - 3}");
-            foreach (var c in r.comments) Small("・" + c);
-            if (MainBtn("下一位客人 →")) NewOrder();
         }
     }
 }
