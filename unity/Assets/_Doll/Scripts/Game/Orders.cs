@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 
 namespace DollWorkshop
@@ -6,10 +7,15 @@ namespace DollWorkshop
     public class Need
     {
         public string tag, needMat, needKind, label;
+        /// <summary>衣服訂單：不要某種衣服、指定某種衣服、指定穿的位置（帽子、外套……）。</summary>
+        public string notType, isType, needSlot;
         public float? min, max;
         public static Need Tag(string tag, float? min = null, float? max = null) => new Need { tag = tag, min = min, max = max };
         public static Need Mat(string mat, string label) => new Need { needMat = mat, label = label };
         public static Need Kind(string kind, string label) => new Need { needKind = kind, label = label };
+        public static Need NotType(string t) => new Need { notType = t };
+        public static Need IsType(string t, string label) => new Need { isType = t, label = label };
+        public static Need Slot(string slot, string label) => new Need { needSlot = slot, label = label };
     }
 
     public class OrderDef
@@ -19,9 +25,13 @@ namespace DollWorkshop
         public int budget;
         public string good, mid, bad;
         public bool free;
+        /// <summary>doll = 做娃娃；cloth = 幫客人的娃娃做衣服（doll 是客人的娃娃）。</summary>
+        public string type = "doll";
+        public DollSpec doll;
+        public bool IsCloth => type == "cloth";
     }
 
-    /// <summary>娃娃訂單（從網頁原型移植）。衣服訂單在 M5 加入。</summary>
+    /// <summary>娃娃訂單與衣服訂單（從網頁原型移植）。</summary>
     public static class Orders
     {
         public static readonly Dictionary<string, (string label, float lo, float hi)> Soft = new Dictionary<string, (string, float, float)>
@@ -67,6 +77,48 @@ namespace DollWorkshop
               "抱著它……我已經想睡了……", "嗯，抱起來還算舒服。", "抱著它反而更清醒了。", Need.Tag("療癒", 3)),
             O("小安", "🧒", "我想要一隻跟我一樣綁雙馬尾的娃娃！要可以帶去學校、塞在書包裡也不會壞掉。", "full", 200,
               "哇！她跟我一模一樣！我要叫她小小安！", "嗯……還可以啦。", "這不像我啦……", Need.Tag("活潑", 2), Need.Tag("可愛", 2)),
+        };
+
+        static OrderDef C(string who, string emoji, string text, DollSpec doll, int budget, string good, string mid, string bad, params Need[] need) =>
+            new OrderDef { type = "cloth", who = who, emoji = emoji, text = text, soft = "any", doll = doll, budget = budget, good = good, mid = mid, bad = bad, need = new List<Need>(need) };
+
+        /// <summary>衣服訂單：客人帶自己的娃娃來，要看清楚娃娃的身形和頭圍。</summary>
+        public static readonly List<OrderDef> Cloth = new List<OrderDef>
+        {
+            C("美玲", "👩‍🦰", "這是我的娃娃「圓圓」，20cm 胖胖體。下個月她要當伴娘，幫她做一件正式又有點可愛的衣服，但不要太花俏。",
+              new DollSpec { torsoW = 1.4f, hair = "hime", hairColor = "cocoa", name = "圓圓", decor = new[] { "eyes_sparkle", "mouth_smile", "blush" } }, 120,
+              "圓圓好美！婚禮上一定最搶眼。", "嗯，可以穿去啦。", "這……不太像伴娘耶。", Need.Tag("高級", 2), Need.Tag("可愛", 1, 3)),
+            C("阿凱", "🧔", "我家「小黑」是 15cm 正常體。天氣變冷了，想幫他做一件暖暖的外套，有點復古感更好。",
+              new DollSpec { torsoH = .82f, headId = "bun", hair = "fluffy", hairColor = "coal", skin = "tan", name = "小黑", decor = new[] { "eyes_dot", "mouth_w" } }, 90,
+              "小黑穿起來好暖，跟我一樣有型。", "還可以，至少不會冷。", "他看起來還是好冷……", Need.Tag("溫柔", 2), Need.Tag("復古", 1)),
+            C("小葵", "👧", "我的娃娃要參加娃娃運動會！她是 20cm 正常體。幫她做一件好活動、很有精神的衣服，不要裙子！",
+              new DollSpec { hair = "twin", hairColor = "milktea", decor = new[] { "eyes_sparkle", "mouth_w", "blush" } }, 100,
+              "她一定會拿第一名！", "嗯……應該跑得動。", "這樣怎麼跑步啦！", Need.Tag("活潑", 2), Need.NotType("skirt")),
+            C("雅婷", "🎤", "我家娃娃「阿喵」是 25cm 正常體，週末要跟我去看搖滾演唱會！幫她做一件酷一點、又有活力的衣服。",
+              new DollSpec { torsoH = 1.27f, hair = "part", hairColor = "coal", name = "阿喵", decor = new[] { "eyes_dot", "mouth_fang" } }, 110,
+              "阿喵穿這樣一定是全場最酷的！", "嗯，可以去演唱會了。", "這穿去演唱會會被笑啦。", Need.Tag("酷", 1), Need.Tag("活潑", 1)),
+            C("Ann", "👩‍🔬", "我的娃娃「糖糖」是 15cm 胖胖體，很怕冷。想幫她做一件可以披著的「斗篷」，摸起來溫暖一點。",
+              new DollSpec { torsoH = .82f, torsoW = 1.4f, hair = "bob", hairColor = "milktea", name = "糖糖", decor = new[] { "eyes_stitch", "blush" } }, 100,
+              "糖糖披著好像一顆暖暖的湯圓！", "這樣應該不會冷了。", "她還是在發抖……", Need.Slot("outer", "要斗篷"), Need.Tag("溫柔", 1)),
+            C("小P", "📷", "我要幫娃娃拍一組文青照片，想要一頂有質感的「帽子」。她的頭比較小，是頭圍 S。",
+              new DollSpec { headSize = .84f, hair = "hime", hairColor = "cocoa", decor = new[] { "eyes_sparkle", "mouth_smile" } }, 80,
+              "這頂帽子一戴，整組照片都有氣質了。", "可以拍，效果還行。", "這頂帽子跟照片風格不太搭。", Need.Slot("hat", "要帽子"), Need.Tag("高級", 1)),
+            C("Grace", "👰", "我開婚紗店，櫥窗娃娃是 20cm 正常體，要當花童。幫她做一件「裙子」，長長的、看起來很高級。",
+              new DollSpec { hair = "twin", hairColor = "milktea", decor = new[] { "eyes_sparkle", "mouth_smile", "blush" } }, 130,
+              "櫥窗一下子變得好夢幻！", "嗯，放櫥窗應該可以。", "這不太像婚禮上的花童……", Need.IsType("skirt", "要裙子"), Need.Tag("高級", 2)),
+            C("小雨", "🧑‍🦱", "我的娃娃「大福」頭比較大，是頭圍 L。冬天到了，想幫她做一頂暖暖的帽子，戴起來軟軟的那種。",
+              new DollSpec { headSize = 1.22f, hair = "bob", hairColor = "cocoa", name = "大福", decor = new[] { "eyes_stitch", "mouth_smile", "blush" } }, 70,
+              "大福戴起來好可愛，一點都不冷了！", "還不錯，冬天可以戴。", "這個……大福戴不太下。", Need.Slot("hat", "要帽子"), Need.Tag("溫柔", 2)),
+        };
+
+        public static readonly List<OrderDef> All = Doll.Concat(Cloth).ToList();
+
+        /// <summary>自由創作：不接單，做自己想做的娃娃或衣服，用自己的錢買材料。</summary>
+        public static OrderDef Free(bool garment) => new OrderDef
+        {
+            type = garment ? "cloth" : "doll", free = true, who = "自由創作", emoji = "🧑‍🎨", soft = "any", budget = 0,
+            text = garment ? "不接單，做一件自己想做的衣服，完成後收進衣櫃。" : "不接單，做一隻自己想做的娃娃，完成後收進展示櫃。",
+            good = "完成了！", mid = "完成了！", bad = "完成了！",
         };
     }
 }

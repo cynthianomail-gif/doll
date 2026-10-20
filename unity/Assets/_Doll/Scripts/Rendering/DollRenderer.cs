@@ -14,6 +14,7 @@ namespace DollWorkshop
         [Tooltip("目前選取的分頁，該部位會畫成虛線外框")] public string highlight;
 
         int builtVersion = -1;
+        DollState builtState;
         string builtHighlight;
 
         class Piece { public GameObject go; public MeshFilter mf; public MeshRenderer mr; public Mesh mesh; public LineRenderer line; }
@@ -28,12 +29,12 @@ namespace DollWorkshop
 
         void LateUpdate()
         {
-            if (state.version != builtVersion || highlight != builtHighlight) Build();
+            if (state.version != builtVersion || highlight != builtHighlight || state != builtState) Build();
         }
 
         public void Build()
         {
-            builtVersion = state.version; builtHighlight = highlight;
+            builtVersion = state.version; builtHighlight = highlight; builtState = state;
             used = 0;
             if (state.DesignReady) DrawDoll();
             for (int i = used; i < pool.Count; i++) pool[i].go.SetActive(false);
@@ -51,6 +52,8 @@ namespace DollWorkshop
                 if (hg.back != null) DrawPoly(hg.back, hf, 1, false, .35f, false);
                 if (hg.tails != null) foreach (var t in hg.tails) DrawPoly(t, hf, 1, false, .35f, false);
             }
+            bool clothed = s.IsHuman;
+            if (clothed) DrawGarment(s.Worn("outer"), 5);
             var mains = s.Mains();
             for (int i = 0; i < mains.Count; i++)
             {
@@ -67,9 +70,13 @@ namespace DollWorkshop
                 DrawStitches(m);
                 if (fx) MainFX(m);
                 Emit(baseOrder + 6);
+                if (clothed && m.id == "torso" && !s.IsHard) { DrawGarment(s.Worn("bottom"), 17); DrawGarment(s.Worn("top"), 18); }
             }
             if (hg != null) DrawPoly(hg.cap, hf, 40, false, .35f, highlight == "hair");
+            if (clothed && !s.IsHard) { DrawGarment(s.Worn("band"), 41); DrawGarment(s.Worn("hat"), 42); DrawGarment(s.Worn("clip"), 43); }
             foreach (var k in s.ActiveParts("front")) DrawPartPair(k, 50, fx);
+            if (clothed && s.IsHard) { DrawGarment(s.Worn("bottom"), 51); DrawGarment(s.Worn("top"), 52); DrawGarment(s.Worn("band"), 53); DrawGarment(s.Worn("hat"), 54); DrawGarment(s.Worn("clip"), 55); }
+            if (clothed) DrawGarment(s.Worn("bag"), 57);
             foreach (var it in s.decor) DecorArt.Draw(mb, it);
             Emit(60);
         }
@@ -98,13 +105,53 @@ namespace DollWorkshop
         readonly MeshBuilder mb = new MeshBuilder();
         static readonly Color Flat = new Color(.27f, .16f, .12f, .3f), Strain = new Color(.82f, .33f, .29f, .7f);
 
-        void Emit(int order)
+        void Emit(int order, int sub = 0)
         {
             if (mb.v.Count == 0) return;
             var pc = Next(); mb.Upload(pc.mesh); mb.Clear();
             pc.mr.sharedMaterial = FabricTextures.Plain;
-            pc.mr.sortingOrder = order * 3;
+            pc.mr.sortingOrder = order * 3 + sub;
             pc.line.positionCount = 0;
+        }
+
+        /// <summary>穿在身上的一件衣服：布片、完成後的車縫線、斗篷領口、毛球、帽梗、髮夾結、衣服上的裝飾。（網頁版 drawGarment）</summary>
+        void DrawGarment(Garment g, int order)
+        {
+            if (g == null || g.cls == null) return;
+            var s = state;
+            var f = g.fab.mat != null && g.fab.color != null ? g.fab : new Fab(DB.Mat("felt"), DB.Col("cream"));
+            var P = Garments.PolyOn(g, s); if (P.Count < 3) return;
+            var ce = SM.Centroid(P); var a = Garments.AnchorOn(g, s); var bb = SM.Bbox(P);
+            var c = f.color.color; var dark = new Color(c.r * .6f, c.g * .6f, c.b * .6f, 1);
+            if (g.type == "bag")
+            {
+                var t = s.GetMain("torso"); var strap = new List<Vector2> { new Vector2(t.cx - t.r * .3f, t.cy - t.r * .42f) };
+                var p0 = strap[0]; var pc = new Vector2(ce.x, bb.yMin - t.r * .5f); var p1 = new Vector2(ce.x + bb.width * .3f, bb.yMin + 2);
+                for (int i = 1; i <= 12; i++) { float u = i / 12f, w = 1 - u; strap.Add(w * w * p0 + 2 * w * u * pc + u * u * p1); }
+                mb.Line(strap, 2, dark); Emit(order - 1, 2);
+            }
+            DrawPoly(P, f, order, false, .3f, false);
+            if (g.done)
+            {
+                float lum = .299f * c.r + .587f * c.g + .114f * c.b;
+                mb.Line(P.Select(p => ce + (p - ce) * .9f).ToList(), 1.4f, lum > .55f ? new Color(c.r * .5f, c.g * .5f, c.b * .5f, 1) : new Color(1, .953f, .878f, 1), true, 3, 4);
+            }
+            if (g.type == "cape")
+            {
+                var m = s.GetMain("torso"); var p0 = new Vector2(m.cx - m.r * .28f, m.cy - m.r * .44f); var pc = new Vector2(m.cx, m.cy - m.r * .25f); var p1 = new Vector2(m.cx + m.r * .28f, m.cy - m.r * .44f);
+                var L = new List<Vector2>(); for (int i = 0; i <= 12; i++) { float u = i / 12f, w = 1 - u; L.Add(w * w * p0 + 2 * w * u * pc + u * u * p1); }
+                mb.Line(L, 2.5f, dark);
+            }
+            var h = s.GetMain("head");
+            if (g.type == "beanie" && g.p["pom"] > .5f)
+            {
+                var pp = new Vector2(bb.center.x, bb.yMin - 4); float r = h.r * .16f;
+                mb.Circle(pp, r + 1.5f, new Color(c.r * .7f, c.g * .7f, c.b * .7f, 1), 20); mb.Circle(pp, r, Color.Lerp(c, Color.white, .35f), 20);
+            }
+            if (g.type == "beret") mb.RoundRect(bb.center.x - 3, bb.yMin - 7, 6, 9, 2, new Color(c.r * .7f, c.g * .7f, c.b * .7f, 1));
+            if (g.type == "clip") mb.Circle(ce, h.r * .05f, new Color(c.r * .7f, c.g * .7f, c.b * .7f, 1), 14);
+            foreach (var t in g.trims) DecorArt.Draw(mb, new DecorItem { type = t.type, x = a.cx + t.x, y = a.cy + t.y, s = t.s, rot = t.rot });
+            Emit(order, 2);
         }
 
         public static Color ThreadColor(Color h)

@@ -47,11 +47,11 @@ namespace DollWorkshop
 
         public LayoutGame(Session ss) : base(ss)
         {
-            units = BuildUnits(D);
+            units = ss.IsGarment ? GarmentUnits(ss) : BuildUnits(D);
             var byKey = new Dictionary<string, Bolt>();
             for (int i = 0; i < units.Count; i++)
             {
-                var u = units[i]; var f = D.FabOf(u.slot); string k = f.mat.id + "_" + f.color.id;
+                var u = units[i]; var f = ss.FabOfSlot(u.slot); string k = f.mat.id + "_" + f.color.id;
                 if (!byKey.TryGetValue(k, out var b)) { b = new Bolt { mat = f.mat, color = f.color }; byKey[k] = b; bolts.Add(b); }
                 u.bolt = bolts.IndexOf(b); b.units.Add(i);
             }
@@ -100,6 +100,14 @@ namespace DollWorkshop
             var f = d.parts["feet"]; if (!f.IsNone) Add("腳", "feet", 4, Sc(f.P, 1.12f * Pk("feet")));
             var bl = d.parts["belly"]; if (!bl.IsNone) Add("肚子", "belly", 1, Sc(bl.P, 1.06f * d.belly.scale));
             return U;
+        }
+
+        /// <summary>衣服的布片：依衣服的尺寸，用人台量出來的版型。</summary>
+        public static List<Unit> GarmentUnits(Session ss)
+        {
+            var g = ss.g; var P = Garments.PolyOn(g, ss.meta.CraftModel(g)); var ce = SM.Centroid(P);
+            var R = CutGame.Resample(P, 160).Select(p => p - ce).ToList(); var b = SM.Bbox(R);
+            return new List<Unit> { new Unit { name = g.T.piece, slot = "garment", mult = g.T.mult, P = R, off = Vector2.zero, size = Mathf.Max(b.width, b.height) } };
         }
 
         public static bool GrainOk(MatDef mat, int r) => mat.grain == "none" || (mat.grain == "two" && r % 2 == 0) || (mat.grain == "one" && r == 0);

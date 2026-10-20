@@ -37,6 +37,8 @@ namespace DollWorkshop
             { Step.Sew, "先在虛線上點幾下放珠針（橘色段落代表還沒固定）。開始車縫後：按住滑鼠沿虛線走，車速不要超過右邊的紅線；珠針靠近時按空白鍵拔掉；開頭和結尾按住 B 回針。覺得太難可以打開「車縫輔助」。" },
             { Step.Stuff, "在棉花袋上按住，拉出棉花（按越久越大團），拖到要塞的部位放開。耳朵、手腳只能塞小團，而且要在身體塞滿之前先塞。在娃娃上來回揉，可以把凹凸揉平。" },
             { Step.Decor, "點右邊的配件加到娃娃上，拖曳移動、滾輪縮放，Delete 刪除。眼睛、鼻子、嘴巴都是刺繡的五官。" },
+            { Step.GDesign, "做衣服：選種類和尺寸。衣服要跟娃娃的身形一樣才穿得下（帽子看頭圍）——看清楚客人說的娃娃身形。" },
+            { Step.GDecor, "在衣服上加蕾絲、鈕扣、口袋等裝飾。" },
             { Step.Deliver, "交件了！看看客人在意的是什麼，下一位客人的話可以讀得更仔細。" },
         };
 
@@ -52,16 +54,34 @@ namespace DollWorkshop
             NewOrder();
         }
 
-        public void NewOrder()
+        public void NewOrder() => StartSession(new Session(meta, meta.NextOrder()), Step.Order);
+
+        /// <summary>自由創作：不接單，直接從設計開始。</summary>
+        public void NewFree(bool garment) => StartSession(new Session(meta, Orders.Free(garment)), garment ? Step.GDesign : Step.Design);
+
+        void StartSession(Session s, Step start)
         {
-            ss = new Session(meta, meta.NextOrder());
-            dollRenderer.state = ss.doll;
+            ss?.ClearPreview();
+            closet = null;
+            ss = s;
+            if (start != Step.Order) ss.Begin(start);
+            dollRenderer.state = ss.ViewDoll;
             design.ResetUI();
             design.onDone = Advance;
-            design.orderBrief = $"{ss.order.who}：「{ss.order.text}」　預算 ${ss.order.budget}";
+            design.orderBrief = ss.order.free ? ss.order.text : $"{ss.order.who}：「{ss.order.text}」　預算 ${ss.order.budget}";
             SyncDesign();
             scroll = Vector2.zero;
         }
+
+        // ---------- 衣櫃 ----------
+        ClosetScreen closet;
+        public void OpenCloset() { ss.ClearPreview(); closet = new ClosetScreen(ss); design.enabled = false; scroll = Vector2.zero; }
+        public void CloseCloset()
+        {
+            closet = null; scroll = Vector2.zero;
+            if (ss.step == Step.Deliver) NewOrder(); else SyncDesign();
+        }
+        CraftGame Active => closet ?? ss.craft;
 
         public void Advance()
         {
@@ -74,7 +94,7 @@ namespace DollWorkshop
 
         void SyncDesign()
         {
-            design.enabled = ss.step == Step.Design;
+            design.enabled = ss.step == Step.Design && closet == null;
             if (!design.enabled) dollRenderer.highlight = null;
         }
 
@@ -85,10 +105,24 @@ namespace DollWorkshop
         {
             cam.orthographicSize = Mathf.Max(2.8f, 4.0f / Mathf.Max(.1f, cam.aspect)); // 整張 800×560 的畫布都要看得到
             if (!design.enabled) cam.rect = new Rect(0, 0, 1 - DesignScreen.PanelWidth / Screen.width, 1);
-            var craft = ss.craft;
-            dollRenderer.gameObject.SetActive(ss.step != Step.Order && (craft == null || craft.ShowDoll));
-            var off = craft?.DollOffset ?? Vector2.zero;
-            dollRenderer.transform.position = new Vector3(off.x / 100f, -off.y / 100f, 0);
+            var craft = Active;
+            ss.SyncPreview();
+            dollRenderer.state = closet != null ? closet.model : ss.ViewDoll;
+            // 衣服訂單：接單時在旁邊小小地顯示客人的娃娃
+            bool customerDoll = closet == null && ss.step == Step.Order && ss.model != null;
+            dollRenderer.gameObject.SetActive(customerDoll || (closet != null || ss.step != Step.Order) && (craft == null || craft.ShowDoll));
+            if (customerDoll)
+            {
+                const float k = .42f; float b = ss.model.Bounds().yMax;
+                dollRenderer.transform.localScale = new Vector3(k, k, 1);
+                dollRenderer.transform.position = DollRenderer.W(new Vector2(560, 440)) - k * DollRenderer.W(new Vector2(SM.CX, b));
+            }
+            else
+            {
+                var off = craft?.DollOffset ?? Vector2.zero;
+                dollRenderer.transform.localScale = Vector3.one;
+                dollRenderer.transform.position = new Vector3(off.x / 100f, -off.y / 100f, 0);
+            }
             if (craft != null)
             {
                 craft.ptr = ptr;
@@ -247,11 +281,12 @@ namespace DollWorkshop
         {
             Styles();
             float pw = DesignScreen.PanelWidth, gx = Screen.width - pw;
-            StepBar(gx);
-            var craft = ss.craft;
+            if (closet == null) StepBar(gx);
+            var craft = Active;
+            if (closet == null && ss.step == Step.Order && ss.model != null) CanvasLabel(new Vector2(560, 448), "客人的娃娃", 13, new Color(.54f, .35f, .23f), TextAnchor.UpperCenter, true);
             if (craft != null) { craft.CanvasGUI(this); if (craft.Hint != null) Hint(craft.Hint); }
             if (Time.time < flashUntil) GUI.Label(new Rect(16, Screen.height - 64, gx - 32, 30), flash, body);
-            if (ss.step == Step.Order) DrawCustomer(gx);
+            if (ss.step == Step.Order && closet == null) DrawCustomer(gx);
             if (design.enabled) return; // 設計步驟的右側面板由 DesignScreen 負責
 
             GUILayout.BeginArea(new Rect(gx, 0, pw, Screen.height), GUI.skin.box);
@@ -269,14 +304,14 @@ namespace DollWorkshop
                 case Step.Paint: PaintPanel(); break;
             }
             GUILayout.Space(12);
-            OrderCard();
+            if (closet == null) OrderCard();
             GUILayout.EndScrollView();
             GUILayout.EndArea();
         }
 
         void TipCard()
         {
-            if (!Tips.TryGetValue(ss.step, out var t) || meta.tipsSeen.Contains(ss.step)) return;
+            if (closet != null || !Tips.TryGetValue(ss.step, out var t) || meta.tipsSeen.Contains(ss.step)) return;
             GUILayout.Label($"💡 {(meta.tutDone ? "小提示" : "新手教學")}　{t}", tip);
             if (GUILayout.Button("知道了", btn, GUILayout.Width(90))) meta.tipsSeen.Add(ss.step);
             GUILayout.Space(6);
@@ -296,6 +331,7 @@ namespace DollWorkshop
             GUILayout.Label($"{o.who}：「{o.text}」", small);
             GUILayout.Label("帳本", h4);
             int dc = ss.DecorCost(), c = ss.Cost();
+            if (o.free) { GUILayout.Label($"材料費 ${c}（自由創作用自己的錢）", small); GUILayout.Label($"💰 ${meta.coins}　⭐ 聲望 {meta.rep}　🧸 {meta.done} 件", small); return; }
             GUILayout.Label($"{(ss.doll.IsHard ? "材料" : "布料")}：{(ss.fabricCost > 0 ? "$" + ss.fabricCost : ss.step == Step.Layout ? $"（排版中：${ss.layout.Cost}）" : "（排版後計價）")}　配件：${dc}", small);
             var old = GUI.contentColor; if (c > o.budget) GUI.contentColor = new Color(.82f, .33f, .29f);
             GUILayout.Label($"合計 ${c} ／ 預算 ${o.budget}", small);
@@ -317,14 +353,21 @@ namespace DollWorkshop
         void OrderPanel()
         {
             H2(ss.order.who);
-            Body(meta.tutDone ? "有客人上門了。仔細讀客人說的話——你要自己判斷對方想要什麼樣的娃娃。" : "第一位客人！讀完需求後接下委託，開始設計第一隻娃娃。");
+            Body(!meta.tutDone ? "第一位客人！讀完需求後接下委託，開始設計第一隻娃娃。"
+                : ss.IsGarment ? "有客人帶著自己的娃娃來訂做衣服。仔細讀客人說的話，也要看清楚娃娃的身形。"
+                : "有客人上門了。仔細讀客人說的話——你要自己判斷對方想要什麼樣的娃娃。");
             if (MainBtn("接下委託 →")) Advance();
-            if (meta.tutDone && Btn("換一位客人")) NewOrder();
+            if (!meta.tutDone) return;
+            if (Btn("換一位客人")) NewOrder();
+            GUILayout.Space(8);
+            if (Btn("🧸 自由創作：做娃娃")) NewFree(false);
+            if (Btn("👗 自由創作：做衣服")) NewFree(true);
+            if (Btn($"🧺 衣櫃（娃娃 {meta.dolls.Count}・衣服 {meta.clothes.Count}）")) OpenCloset();
         }
 
         void Placeholder(string what) => Small($"（「{what}」的小遊戲在 M6 移植，先用滑桿設定結果，讓流程可以走完。）");
 
-        float Slider(string label, float v, float min, float max, string valueText = null)
+        public float Slider(string label, float v, float min, float max, string valueText = null)
         {
             GUILayout.BeginHorizontal();
             GUILayout.Label(label, body, GUILayout.Width(110));

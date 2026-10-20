@@ -49,6 +49,75 @@ namespace DollWorkshop
             return t;
         }
 
+        /// <summary>衣服的標籤：種類、版型參數、布料、顏色、裝飾。</summary>
+        public static Dictionary<string, float> GTally(Garment g)
+        {
+            var t = Tags.ToDictionary(x => x, x => 0f);
+            void Add(IEnumerable<string> a) { foreach (var x in a) if (t.ContainsKey(x)) t[x] += 1; }
+            var p = g.p; Add(g.T.tags);
+            if (g.type == "top") { if (p["sleeve"] > .75f) Add(new[] { "溫柔" }); if (p["loose"] > 1.18f) Add(new[] { "療癒" }); }
+            if (g.type == "pants" && p["len"] < .35f) Add(new[] { "活潑" });
+            if (g.type == "skirt") { if (p["len"] > .75f) Add(new[] { "高級" }); if (p["flare"] > .65f) Add(new[] { "可愛" }); }
+            if (g.type == "cape") { if (p["len"] > .7f) Add(new[] { "高級" }); if (p["width"] > .7f) Add(new[] { "溫柔" }); }
+            if (g.fab.mat != null) { Add(g.fab.mat.tags); Add(g.fab.color.tags); }
+            foreach (var it in g.trims) { var d = DB.DecorById(it.type); if (d != null) Add(d.tags); }
+            return t;
+        }
+
+        /// <summary>只看裁布和車縫的手工分數（衣服、自由創作用）。</summary>
+        public static float CraftScore(Session ss, List<string> comments)
+        {
+            float craft = (ss.cutAcc + ss.SewAcc) / 2;
+            if (ss.offGrain > 0) { craft -= Mathf.Min(.3f, ss.offGrain * .06f); comments.Add("有些布片的布紋方向不對，摸起來怪怪的。"); }
+            int flaws = ss.doll.stains.Count + ss.otherFlaws;
+            if (flaws > 0) { craft -= .06f * flaws; comments.Add("有個地方好像有點髒。"); }
+            if (!ss.BackOk) { craft -= .08f; comments.Add("線頭鬆鬆的，會不會散開啊？"); }
+            return Mathf.Clamp01(craft);
+        }
+
+        public static Result EvaluateGarment(Session ss)
+        {
+            var o = ss.order; var g = ss.g; var t = GTally(g); var r = new Result { fitLabel = true };
+            var reqS = new List<float>();
+            foreach (var n in o.need)
+            {
+                if (n.notType != null) { bool ok = g.type != n.notType; var nm = Garments.Of(n.notType).name; r.review.Add(($"不要{nm}", ok)); if (!ok) r.comments.Add($"我說過不要{nm}的……"); reqS.Add(ok ? 1 : 0); continue; }
+                if (n.isType != null) { bool ok = g.type == n.isType; r.review.Add((n.label, ok)); if (!ok) r.comments.Add($"我想要的是{Garments.Of(n.isType).name}耶……"); reqS.Add(ok ? 1 : 0); continue; }
+                if (n.needSlot != null) { bool ok = g.T.slot == n.needSlot; r.review.Add((n.label, ok)); if (!ok) r.comments.Add($"我想要的是{n.label.Replace("要", "")}耶……"); reqS.Add(ok ? 1 : 0); continue; }
+                if (n.tag == null) { reqS.Add(1); continue; }
+                float v = t[n.tag], s = 1;
+                if (n.min != null && v < n.min) { s = Mathf.Min(s, v / n.min.Value); r.comments.Add($"感覺不夠「{n.tag}」……"); }
+                if (n.max != null && v > n.max) { s = Mathf.Min(s, Mathf.Max(0, 1 - (v - n.max.Value) * .4f)); r.comments.Add($"太「{n.tag}」了啦。"); }
+                r.review.Add((NeedText(n), NeedOk(n, v)));
+                reqS.Add(s);
+            }
+            r.tagS = reqS.Count > 0 ? reqS.Average() : 1;
+            string fitCls = Garments.FitClassOf(g, ss.model); bool fit = g.cls == fitCls;
+            r.review.Add(("尺寸合身", fit));
+            if (!fit) r.comments.Insert(0, $"這是 {g.cls} 的尺寸，我的娃娃是 {fitCls}，穿不下……");
+            r.craft = CraftScore(ss, r.comments);
+            if (r.craft < .55f) r.comments.Add("縫得有點粗糙。");
+            r.cost = ss.Cost(); bool over = r.cost > o.budget;
+            r.review.Add(("在預算內", !over));
+            if (over) r.comments.Add($"超出預算了（${r.cost}），我只能付原本說好的錢。");
+            r.softS = fit ? 1 : 0;
+            r.total = Mathf.Clamp01(.45f * r.tagS + .25f * (fit ? 1 : 0) + .3f * r.craft - (over ? .15f : 0));
+            r.stars = fit ? Mathf.Max(1, Mathf.RoundToInt(r.total * 5)) : 1;
+            r.pay = Mathf.RoundToInt(o.budget * (r.stars >= 2 ? .5f + .5f * r.total : .2f));
+            r.profit = r.pay - r.cost;
+            r.line = !fit ? "尺寸不對，她穿不下……" : r.stars >= 4 ? o.good : r.stars == 3 ? o.mid : o.bad;
+            return r;
+        }
+
+        /// <summary>自由創作：不比對客人需求，只看手工；材料費自己付。</summary>
+        public static Result EvaluateFree(Session ss)
+        {
+            var r = new Result { free = true };
+            r.craft = !ss.IsGarment && ss.doll.IsHard ? (ss.hardAccs.Count > 0 ? ss.hardAccs.Values.Average() : .8f) : CraftScore(ss, r.comments);
+            r.cost = ss.Cost(); r.profit = -r.cost; r.line = "完成了！";
+            return r;
+        }
+
         static bool NeedOk(Need n, float v) => (n.min == null || v >= n.min) && (n.max == null || v <= n.max);
 
         static string NeedText(Need n) =>

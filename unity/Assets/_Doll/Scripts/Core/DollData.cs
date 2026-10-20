@@ -189,7 +189,14 @@ namespace DollWorkshop
             new DecorDef("scar", "縫線疤痕", 10, "body", "酷", "手作感") { hit = 22 }, new DecorDef("pin", "安全別針", 10, "acc", "酷") { hit = 20 },
             new DecorDef("scarf", "格紋圍巾", 30, "neck", "復古", "溫柔") { hit = 50 },
         };
-        public static DecorDef DecorById(string id) => Decor.FirstOrDefault(d => d.id == id);
+        /// <summary>只能加在衣服上的裝飾（蕾絲、鈕扣、口袋）。</summary>
+        public static readonly List<DecorDef> TrimDefs = new List<DecorDef>
+        {
+            new DecorDef("lace", "蕾絲邊", 12, "trim", "高級", "可愛") { hit = 32 }, new DecorDef("button1", "鈕扣", 3, "trim", "復古") { hit = 10 },
+            new DecorDef("pocket", "口袋", 6, "trim", "活潑") { hit = 16 },
+        };
+
+        public static DecorDef DecorById(string id) => Decor.FirstOrDefault(d => d.id == id) ?? TrimDefs.FirstOrDefault(d => d.id == id);
 
         public static readonly string[] SlotKeys = { "body", "hair", "ears", "earInner", "arms", "feet", "belly" };
         public static readonly Dictionary<string, string> SlotName = new Dictionary<string, string>

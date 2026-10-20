@@ -18,14 +18,25 @@ namespace DollWorkshop
         bool holdButton; public void HoldBack() => holdButton = true;
         public bool backHold;
 
-        public List<Seam> List => D.seams;
-        public Seam SW => D.seams[cur];
+        public List<Seam> List => ss.Seams;
+        public Seam SW => List[cur];
+        bool G => ss.IsGarment;
 
         public SewGame(Session ss) : base(ss)
         {
-            D.seams.Clear();
-            foreach (var m in Enumerable.Reverse(D.Mains())) D.seams.Add(MakeSeam(m));
+            List.Clear();
+            if (G) List.Add(GarmentSeam());
+            else foreach (var m in Enumerable.Reverse(D.Mains())) List.Add(MakeSeam(m));
             D.Touch();
+        }
+
+        List<Vector2> GarmentPoly() => Garments.PolyOn(ss.g, ss.meta.CraftModel(ss.g));
+
+        /// <summary>衣服的縫線：沿著布片內縮一點，下方留開口（翻面用）。</summary>
+        public Seam GarmentSeam()
+        {
+            var P = CutGame.Resample(GarmentPoly(), 320); var c = SM.Centroid(P);
+            return SeamFromPts("garment", ss.g.T.name, P.Select(p => c + (p - c) * .93f).ToList(), c.x, c.y, 90, 25);
         }
 
         /// <summary>從一圈有順序的點做縫線：開口（gapDeg 方向 ±halfDeg）不車，從開口後面開始車到開口前面。轉彎越急，車速上限越低。</summary>
@@ -136,9 +147,9 @@ namespace DollWorkshop
         /// <summary>拆線重來：珠針位置保留。</summary>
         public void Resew()
         {
-            var sw = SW; var n = MakeSeam(D.GetMain(sw.mid));
+            var sw = SW; var n = G ? GarmentSeam() : MakeSeam(D.GetMain(sw.mid));
             foreach (var p in sw.pins) n.pins.Add(new Pin { i = p.i });
-            n.sewing = true; D.seams[cur] = n; D.Touch();
+            n.sewing = true; List[cur] = n; D.Touch();
         }
 
         public float SewAcc => List.Count > 0 ? List.Average(s => s.acc) : 0;
@@ -147,6 +158,7 @@ namespace DollWorkshop
         public override string Hint => !SW.sewing ? $"{SW.name}：先放珠針（點虛線放一根，再點一次拿掉）" : SW.done ? $"{SW.name}車好了！" : $"{SW.name}：從綠點車到紅點・空白鍵拔珠針・B 回針";
         public override bool Done => List.All(s => s.done);
         public override bool HideCursor => SW.sewing && !SW.done;
+        public override bool ShowDoll => !G;
 
         public override void Down(Vector2 p)
         {
@@ -180,8 +192,20 @@ namespace DollWorkshop
         // ---------- 畫面 ----------
         public override void Draw(Sketch under, Sketch over)
         {
-            var sw = SW; float now = Now; var g = over.P;
-            var bc = D.FabOf("body").color.color; bool light = .299f * bc.r + .587f * bc.g + .114f * bc.b > .5f;
+            var sw = SW; float now = Now;
+            var fab = ss.FabOfSlot(G ? "garment" : "body");
+            if (G)
+            {
+                // 做衣服時只看布片本身，針腳畫在布片上
+                under.Piece(GarmentPoly(), fab.mat, fab.color, 2, .3f);
+                var st = sw.stitches.Where(x => !x.bad).Select(x => new Vector2(sw.cx + x.dx, sw.cy + x.dy)).ToList();
+                var tc = DollRenderer.ThreadColor(fab.color.color);
+                for (int i = 0; i < st.Count - 1; i++) if ((i / 3) % 2 == 0) under.P.Seg(st[i], st[i + 1], 2.2f, tc);
+                if (sw.backStart && st.Count > 1) under.P.Line(st.Take(8).ToList(), 3.2f, tc);
+                if (sw.backEnd && st.Count > 1) under.P.Line(st.Skip(Mathf.Max(0, st.Count - 8)).ToList(), 3.2f, tc);
+            }
+            var g = over.P;
+            var bc = fab.color.color; bool light = .299f * bc.r + .587f * bc.g + .114f * bc.b > .5f;
             var rest = sw.path.Skip(sw.idx).Select(p => p.p).ToList();
             g.Line(rest, 2, light ? new Color(.31f, .2f, .16f, .55f) : new Color(1, 1, 1, .7f), false, 4, 5);
             var run = new List<Vector2>();
@@ -256,7 +280,7 @@ namespace DollWorkshop
             if (sw.done)
             {
                 ui.Small($"這條車得 {Mathf.RoundToInt(sw.acc * 100)}%（跳針 {sw.jams} 次、撞到珠針 {sw.pinHits} 次）");
-                if (cur >= List.Count - 1) { if (ui.MainBtn("下一步：塞棉花 →")) ui.Advance(); }
+                if (cur >= List.Count - 1) { if (ui.MainBtn(G ? "下一步：裝飾 →" : "下一步：塞棉花 →")) ui.Advance(); }
                 else if (ui.MainBtn($"下一條：車{List[cur + 1].name} →")) cur++;
             }
             ui.Small($"回針：開頭 {(sw.backStart ? "✔" : "—")}　結尾 {(sw.backEnd ? "✔" : "—")}");

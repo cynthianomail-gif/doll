@@ -249,6 +249,101 @@ namespace DollWorkshop.EditorTools
                 if (sd.Mood != mood || (sd.ConfettiCount > 0) != conf) Check(false, $"{stars}★ 的客人反應不對（{sd.Mood}）");
             }
             Check(true, "1–2★ 冒冷汗、3★ 普通、4–5★ 開心＋彩紙");
+
+            RunGarments(meta);
+        }
+
+        static Session GarmentRun(Meta meta, OrderDef o, string type, string cls, string mat, string color, params string[] trims)
+        {
+            var ss = new Session(meta, o);
+            if (o.free) ss.Begin(Step.GDesign); else ss.Advance();
+            var gd = (GarmentDesign)ss.craft;
+            gd.SetType(type); if (cls != null) gd.SetCls(cls); gd.SetMat(DB.Mat(mat)); gd.SetColor(DB.Col(color));
+            ss.Advance(); ss.layout.AutoPack(); ss.Advance(); CutAll(ss); ss.Advance(); SewAll((SewGame)ss.craft, true); ss.Advance();
+            var dg = (DecorGame)ss.craft; foreach (var t in trims) dg.Add(t);
+            ss.Advance();
+            return ss;
+        }
+
+        static void RunGarments(Meta meta)
+        {
+            // ---------- 衣服版型 ----------
+            var man = meta.Mannequin("20cm 正常體");
+            foreach (var t in Garments.Types)
+            {
+                var g = Garments.New(null); Garments.SetType(g, t.id, true);
+                var P = Garments.PolyOn(g, man);
+                if (P.Count < 3 || P.Any(p => float.IsNaN(p.x) || float.IsNaN(p.y))) Check(false, $"{t.name} 版型算不出來");
+            }
+            Check(true, $"{Garments.Types.Count} 種衣服配件的版型都算得出來");
+            var big = Garments.New("25cm 胖胖體"); var small = Garments.New("15cm 正常體");
+            Check(SM.Bbox(Garments.PolyOn(big, man)).width > SM.Bbox(Garments.PolyOn(small, man)).width, "胖胖體的上衣比正常體寬");
+            Check(meta.Mannequin("15cm 胖胖體").BodyClass() == "15cm 胖胖體" && meta.MannequinHead("頭圍 L").HeadClass() == "頭圍 L", "人台的身形、頭圍判定正確");
+
+            // ---------- 衣服訂單 ----------
+            var mei = Orders.Cloth.First(o => o.who == "美玲");
+            var s1 = new Session(meta, mei);
+            Check(s1.IsGarment && s1.model != null && s1.model.BodyClass() == "20cm 胖胖體", $"客人的娃娃：{s1.model?.BodyClass()}");
+            Check(s1.Steps().SequenceEqual(new[] { Step.Order, Step.GDesign, Step.Layout, Step.Cut, Step.Sew, Step.GDecor, Step.Deliver }), "衣服訂單的步驟");
+            s1.Advance();
+            Check(s1.step == Step.GDesign && s1.g.cls == null && !s1.CanAdvance(out _), "沒選尺寸不能往下");
+            int coins0 = meta.coins;
+            var ok = GarmentRun(meta, mei, "skirt", "20cm 胖胖體", "minky", "pink", "lace", "bow");
+            Check(ok.step == Step.Deliver && ok.result.review.Any(x => x.text == "尺寸合身" && x.ok), $"美玲：做對尺寸的裙子 {ok.result.stars}★，{string.Join("、", ok.result.review.Select(x => (x.ok ? "✔" : "✘") + x.text))}");
+            Check(ok.g.done && ok.g.trims.Count == 2 && ok.layout.units.Count == 1 && ok.layout.units[0].mult == 2, $"衣服完成：{ok.g.name}，裝飾 {ok.g.trims.Count} 個，布片「{ok.layout.units[0].name}」×2");
+            Check(ok.model.Worn("bottom") == ok.g, "客人的娃娃身上穿著做好的裙子");
+            Check(meta.coins == coins0 + ok.result.profit, $"衣服訂單也進帳（{ok.result.profit}）");
+            var wrong = GarmentRun(meta, mei, "skirt", "20cm 正常體", "minky", "pink");
+            Check(wrong.result.stars == 1 && wrong.result.line.Contains("穿不下") && wrong.result.comments[0].Contains("20cm 胖胖體"), $"尺寸做錯：{wrong.result.stars}★、「{wrong.result.comments[0]}」");
+            var kui = Orders.Cloth.First(o => o.who == "小葵");
+            var sk = GarmentRun(meta, kui, "skirt", "20cm 正常體", "cotton", "lemon");
+            Check(sk.result.review.Any(x => x.text == "不要裙子" && !x.ok), "小葵說不要裙子，做裙子會被扣分");
+            var p = Orders.Cloth.First(o => o.who == "小P");
+            var hat = GarmentRun(meta, p, "beret", "頭圍 S", "felt", "coal");
+            Check(hat.result.review.Any(x => x.text == "要帽子" && x.ok) && hat.result.review.Any(x => x.text == "尺寸合身" && x.ok), $"小P：頭圍 S 的貝雷帽 {hat.result.stars}★");
+            var hatL = GarmentRun(meta, p, "beanie", "頭圍 L", "knit", "cream");
+            Check(hatL.result.review.Any(x => x.text == "尺寸合身" && !x.ok), "頭圍做錯，帽子戴不下");
+            var band = GarmentRun(meta, p, "hairband", null, "cotton", "pink");
+            Check(band.g.cls == "通用" && band.result.review.Any(x => x.text == "尺寸合身" && x.ok), "髮帶是通用尺寸");
+
+            // ---------- 自由創作與衣櫃 ----------
+            int c0 = meta.coins, n0 = meta.clothes.Count;
+            var free = GarmentRun(meta, Orders.Free(true), "top", "20cm 正常體", "felt", "sky", "button1", "pocket");
+            Check(free.result.free && meta.clothes.Count == n0 + 1 && meta.coins == c0 - free.result.cost, $"自由創作做衣服：收進衣櫃，材料費 ${free.result.cost}");
+            var fd = new Session(meta, Orders.Free(false)); fd.Begin(Step.Design);
+            fd.doll.kind = "human"; fd.doll.fab["body"] = new Fab(DB.Mat("cotton"), DB.Col("skin")); fd.doll.Rebuild();
+            Layout(fd); fd.Advance(); CutAll(fd); fd.Advance(); SewAll((SewGame)fd.craft, true); fd.Advance(); StuffAll((StuffGame)fd.craft, .7f, .75f); fd.Advance(); fd.Advance();
+            Check(fd.result.free && meta.dolls.Contains(fd.doll) && fd.doll.name.StartsWith("娃娃"), $"自由創作做娃娃：收進展示櫃（{fd.doll.name}，{fd.doll.BodyClass()}）");
+            free.ClearPreview(); // 遊戲裡開衣櫃或換下一單時會清掉試穿
+            var cl = new ClosetScreen(fd);
+            cl.model = meta.Mannequin("20cm 正常體");
+            Check(cl.Wear(free.g) == null && cl.model.Worn("top") == free.g, "人台穿上同身形的上衣");
+            Check(cl.Wear(free.g) == null && cl.model.Worn("top") == null, "再點一次脫下");
+            cl.model = meta.Mannequin("25cm 胖胖體");
+            Check(cl.Wear(free.g) != null, $"不同身形穿不下：{cl.Wear(free.g)}");
+            cl.model = new DollState();
+            Check(cl.Wear(free.g) != null, "動物布偶不能穿衣服");
+            Check(meta.ClosetModels().Count == 9 + meta.dolls.Count, $"衣櫃裡的娃娃：9 個人台＋{meta.dolls.Count} 隻");
+
+            // 繪圖：穿著衣服的娃娃可以畫出來
+            var go = new GameObject("test renderer"); var rend = go.AddComponent<DollRenderer>();
+            try
+            {
+                var m = meta.Mannequin("20cm 正常體");
+                m.wear.Clear(); rend.state = m; rend.Build();
+                int bare = 0; foreach (Transform c in go.transform) if (c.gameObject.activeSelf) bare++;
+                foreach (var t in Garments.Types)
+                {
+                    var g = Garments.New("20cm 正常體"); Garments.SetType(g, t.id, true); g.fab = new Fab(DB.Mat("cotton"), DB.Col("pink")); g.done = true;
+                    g.trims.Add(new DecorItem { type = "lace", x = 0, y = 0 });
+                    m.wear[t.slot] = g;
+                }
+                m.Touch(); rend.Build();
+                int dressed = 0; foreach (Transform c in go.transform) if (c.gameObject.activeSelf) dressed++;
+                Check(dressed >= bare + 7, $"穿上 7 個位置的衣服配件後多畫了 {dressed - bare} 個網格");
+                m.wear.Clear(); m.Touch();
+            }
+            finally { Object.DestroyImmediate(go); }
         }
     }
 }

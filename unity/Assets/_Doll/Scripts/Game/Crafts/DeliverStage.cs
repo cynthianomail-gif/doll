@@ -19,16 +19,17 @@ namespace DollWorkshop
 
         public DeliverStage(Session ss) : base(ss)
         {
-            if (R != null && R.stars >= 4)
+            if (R != null && (R.stars >= 4 || R.free))
             {
                 var cols = new[] { "#f4b6c6", "#f6d96b", "#a9d3ee", "#a6dcc0", "#e07a5f" }.Select(Hex).ToArray();
-                for (int i = 0; i < 90; i++)
+                for (int i = 0; i < (R.free ? 60 : 90); i++)
                     confetti.Add(new Bit { p = new Vector2(SM.CX - 90 + (Random.value - .5f) * 80, SM.CY - 40), v = new Vector2((Random.value - .5f) * 9, -Random.value * 9 - 3), c = cols[i % 5], r = Random.value * Mathf.PI, l = 1 });
             }
         }
 
         public int ConfettiCount => confetti.Count;
-        public string Mood => R == null ? "" : R.stars >= 4 ? "happy" : R.stars <= 2 ? "sad" : "ok";
+        public string Mood => R == null || R.free ? "" : R.stars >= 4 ? "happy" : R.stars <= 2 ? "sad" : "ok";
+        DollState V => ss.ViewDoll;
 
         public override string Hint => null;
         public override bool Done => true;
@@ -55,12 +56,20 @@ namespace DollWorkshop
             float now = Now; var g = under.P;
             g.Rect(-600, -400, 2000, 1400, Hex("#e9cfb5"));
             g.Blob(new Vector2(SM.CX - 90, SM.CY - 20), 560, Hex("#fff6ea"), Hex("#e9cfb5"), 64);
-            float b = D.Bounds().yMax, cx = SM.CX - 90;
+            float b = V.Bounds().yMax, cx = SM.CX - 90;
             g.Ellipse(new Vector2(cx, b + 18), 150, 26, Hex("#c98b5e"), 40);
             g.Ellipse(new Vector2(cx, b + 8), 150, 24, Hex("#d9a173"), 40);
 
+            var o = over.P;
+            foreach (var p in confetti)
+            {
+                var c = p.c; c.a = Mathf.Clamp01(p.l);
+                var q = new[] { new Vector2(-4, -2.5f), new Vector2(4, -2.5f), new Vector2(4, 2.5f), new Vector2(-4, 2.5f) }.Select(v => p.p + SM.RotV(v.x, v.y, p.r)).ToArray();
+                o.Quad(q[0], q[1], q[2], q[3], c);
+            }
+            if (R == null || R.free) return;
             // 客人：依星等變表情
-            var o = over.P; var f = Face + new Vector2(0, Mathf.Sin(now / 500) * 4);
+            var f = Face + new Vector2(0, Mathf.Sin(now / 500) * 4);
             o.Circle(f + new Vector2(0, 50), 34, Pastel(ss.order.who) * new Color(.85f, .85f, .85f, 1), 32);
             o.Circle(f, 46, Hex("#5a4636"), 40); o.Circle(f, 44, Hex("#ffe3cc"), 40);
             var ink = Hex("#4a3b32");
@@ -83,22 +92,22 @@ namespace DollWorkshop
                 }
             }
             foreach (var h in hearts) o.Fill(DecorArt.HeartPoly(.8f).Select(p => p + h.p).ToList(), new Color(1, .48f, .61f, Mathf.Clamp01(h.l)));
-            foreach (var p in confetti)
-            {
-                var c = p.c; c.a = Mathf.Clamp01(p.l);
-                var q = new[] { new Vector2(-4, -2.5f), new Vector2(4, -2.5f), new Vector2(4, 2.5f), new Vector2(-4, 2.5f) }.Select(v => p.p + SM.RotV(v.x, v.y, p.r)).ToArray();
-                o.Quad(q[0], q[1], q[2], q[3], c);
-            }
         }
 
         public override void CanvasGUI(GameScreen ui)
         {
             var r = R; if (r == null) return;
             var brown = Hex("#8a5a3a");
-            ui.CanvasLabel(new Vector2(24, 24), $"給 {ss.order.who} 的娃娃", 15, brown, TextAnchor.UpperLeft, true);
-            var d = D;
+            bool gm = ss.IsGarment; var d = D;
+            ui.CanvasLabel(new Vector2(24, 24), r.free ? (gm ? ss.g.name : d.name) : $"給 {ss.order.who} 的{(gm ? "衣服" : "娃娃")}", 15, brown, TextAnchor.UpperLeft, true);
             string kind = d.IsHuman ? "人形娃娃・" + d.BodyClass() : d.body.name;
-            ui.CanvasLabel(new Vector2(24, 46), $"{kind}・{d.FabricCount()} 種布・{Evaluator.SoftLabel(d.OverallSoft())}", 13, Hex("#9a8778"), TextAnchor.UpperLeft);
+            ui.CanvasLabel(new Vector2(24, 46), gm ? $"{ss.g.T.name}・{ss.g.cls}・{ss.g.fab.mat.name}" : $"{kind}・{d.FabricCount()} 種布・{Evaluator.SoftLabel(d.OverallSoft())}", 13, Hex("#9a8778"), TextAnchor.UpperLeft);
+            if (r.free)
+            {
+                ui.CanvasLabel(new Vector2(640, 200), "完成！", 22, brown, TextAnchor.MiddleCenter, true);
+                ui.CanvasLabel(new Vector2(640, 232), gm ? $"收進衣櫃（{ss.g.cls}）" : "收進展示櫃", 15, brown, TextAnchor.MiddleCenter);
+                return;
+            }
             ui.CanvasLabel(new Vector2(645, 130), new string('★', r.stars) + new string('☆', 5 - r.stars), 30, Hex("#e0a020"), TextAnchor.MiddleCenter);
             ui.CanvasBubble(new Vector2(510, 170), 270, r.line, 17);
             ui.CanvasLabel(Face + new Vector2(0, 96), ss.order.who, 14, Ink, TextAnchor.MiddleCenter, true, true);
@@ -107,11 +116,22 @@ namespace DollWorkshop
         public override void Panel(GameScreen ui)
         {
             var r = R; var green = Hex("#6aa88a");
+            if (r.free)
+            {
+                ui.H2("完成！");
+                ui.Body(ss.IsGarment ? "這件衣服收進衣櫃了，可以拿給同身形的娃娃穿。" : "這隻娃娃收進展示櫃了，可以到衣櫃幫它換衣服。");
+                ui.Bar("手工品質", r.craft, green, $"{Mathf.RoundToInt(r.craft * 100)}%");
+                ui.Body($"材料費 -${r.cost}（自由創作用自己的錢）");
+                foreach (var c in r.comments) ui.Small("・" + c);
+                if (ui.MainBtn("回到工作室 →")) ui.NextCustomer();
+                if (ui.Btn("🧺 去衣櫃")) ui.OpenCloset();
+                return;
+            }
             ui.H2("交件");
             ui.Small($"交件後才知道：{ss.order.who}在意的是——");
             foreach (var (text, ok) in r.review) ui.Body($"{(ok ? "✔" : "✘")} {text}");
             ui.Bar("符合期待", r.tagS, green, $"{Mathf.RoundToInt(r.tagS * 100)}%");
-            ui.Bar("柔軟度", r.softS, green, $"{Mathf.RoundToInt(r.softS * 100)}%");
+            ui.Bar(r.fitLabel ? "合身" : "柔軟度", r.softS, green, $"{Mathf.RoundToInt(r.softS * 100)}%");
             ui.Bar("手工品質", r.craft, green, $"{Mathf.RoundToInt(r.craft * 100)}%");
             ui.Body($"成本 ${r.cost} ／ 預算 ${ss.order.budget}　收到 ${r.pay}　利潤 {(r.profit >= 0 ? "+" : "")}${r.profit}　聲望 {(r.stars - 3 >= 0 ? "+" : "")}{r.stars - 3}");
             foreach (var c in r.comments) ui.Small("・" + c);

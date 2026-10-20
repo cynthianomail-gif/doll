@@ -68,6 +68,15 @@ namespace DollWorkshop
         public readonly List<Seam> seams = new List<Seam>();
         public readonly List<Stain> stains = new List<Stain>();
         public readonly List<DecorItem> decor = new List<DecorItem>();
+
+        /// <summary>名字（自由創作的娃娃、客人的娃娃、人台）。</summary>
+        public string name = "";
+        /// <summary>身上穿的衣服（位置 → 衣服），以及設計中試穿的那一件（不會留在身上）。</summary>
+        public readonly Dictionary<string, Garment> wear = new Dictionary<string, Garment>();
+        public Garment preview;
+
+        /// <summary>這個位置現在穿的衣服（試穿中的優先）。</summary>
+        public Garment Worn(string slot) => preview != null && preview.T.slot == slot ? preview : wear.TryGetValue(slot, out var g) ? g : null;
         /// <summary>揉棉花時的晃動（0–1）與動畫時間（毫秒）。</summary>
         public float squish, squishTime;
 

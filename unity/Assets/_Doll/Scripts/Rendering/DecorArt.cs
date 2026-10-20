@@ -149,6 +149,24 @@ namespace DollWorkshop
                         g.FillStroke(MeshBuilder.RoundRectPoly(-22, -7, 9, 14, 3), H("#c9cdd3"), H("#8a8f98"), 1.5f);
                     }
                     break;
+                case "lace":
+                    g.FillStroke(new List<Vector2> { new Vector2(-30, -3), new Vector2(30, -3), new Vector2(30, 2), new Vector2(-30, 2) }, H("#fffaf2"), H("#e6d9c6"), 1);
+                    for (int x = -27; x <= 27; x += 6)
+                    {
+                        var sc = Arc(x, 2, 3.4f, 0, Mathf.PI, 8);
+                        g.FillStroke(sc, H("#fffaf2"), H("#e6d9c6"), 1);
+                        g.Stroke(Circ(x, 2, 1, 8), 1, H("#e6d9c6"), true);
+                    }
+                    break;
+                case "button1":
+                    g.FillStroke(Circ(0, 0, 5, 16), H("#f4efe6"), H("#8a7565"), 1.5f);
+                    g.Fill(Circ(-1.6f, 0, .9f, 8), H("#8a7565")); g.Fill(Circ(1.6f, 0, .9f, 8), H("#8a7565"));
+                    break;
+                case "pocket":
+                    g.FillStroke(MeshBuilder.RoundRectPoly(-11, -9, 22, 19, 4), new Color(1, 1, 1, .35f), new Color(.24f, .16f, .12f, .45f), 1.5f);
+                    g.Stroke(MeshBuilder.RoundRectPoly(-8, -6, 16, 13, 3), 1.5f, new Color(.24f, .16f, .12f, .45f), true, 2, 2);
+                    g.Seg(-11, -4, 11, -4, 1.5f, new Color(.24f, .16f, .12f, .45f));
+                    break;
                 case "scarf":
                     {
                         const float a = .12f;
