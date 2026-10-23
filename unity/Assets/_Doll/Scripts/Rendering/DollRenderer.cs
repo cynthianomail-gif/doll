@@ -75,6 +75,7 @@ namespace DollWorkshop
             if (hg != null) DrawPoly(hg.cap, hf, 40, false, .35f, highlight == "hair");
             if (clothed && !s.IsHard) { DrawGarment(s.Worn("band"), 41); DrawGarment(s.Worn("hat"), 42); DrawGarment(s.Worn("clip"), 43); }
             foreach (var k in s.ActiveParts("front")) DrawPartPair(k, 50, fx);
+            if (s.IsHard) DrawPaint(50);
             if (clothed && s.IsHard) { DrawGarment(s.Worn("bottom"), 51); DrawGarment(s.Worn("top"), 52); DrawGarment(s.Worn("band"), 53); DrawGarment(s.Worn("hat"), 54); DrawGarment(s.Worn("clip"), 55); }
             if (clothed) DrawGarment(s.Worn("bag"), 57);
             foreach (var it in s.decor) DecorArt.Draw(mb, it);
@@ -152,6 +153,20 @@ namespace DollWorkshop
             if (g.type == "clip") mb.Circle(ce, h.r * .05f, new Color(c.r * .7f, c.g * .7f, c.b * .7f, 1), 14);
             foreach (var t in g.trims) DecorArt.Draw(mb, new DecorItem { type = t.type, x = a.cx + t.x, y = a.cy + t.y, s = t.s, rot = t.rot });
             Emit(order, 2);
+        }
+
+        /// <summary>硬材質的上色層：一張蓋住整張畫布的貼圖。</summary>
+        void DrawPaint(int order)
+        {
+            var layer = PaintLayer.For(state);
+            var pc = Next(); var mesh = pc.mesh; mesh.Clear();
+            mesh.SetVertices(new List<Vector3> { W(new Vector2(0, SM.H)), W(new Vector2(SM.W, SM.H)), W(new Vector2(SM.W, 0)), W(new Vector2(0, 0)) });
+            mesh.SetUVs(0, new List<Vector2> { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1) });
+            mesh.SetColors(new List<Color> { Color.white, Color.white, Color.white, Color.white });
+            mesh.SetTriangles(new List<int> { 0, 1, 2, 0, 2, 3, 0, 2, 1, 0, 3, 2 }, 0, true);
+            pc.mr.sharedMaterial = layer.mat;
+            pc.mr.sortingOrder = order * 3 + 2;
+            pc.line.positionCount = 0;
         }
 
         public static Color ThreadColor(Color h)

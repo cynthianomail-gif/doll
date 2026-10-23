@@ -68,6 +68,9 @@ namespace DollWorkshop
         public readonly List<Seam> seams = new List<Seam>();
         public readonly List<Stain> stains = new List<Stain>();
         public readonly List<DecorItem> decor = new List<DecorItem>();
+        public readonly PaintData paint = new PaintData();
+        /// <summary>上色層的快取（畫面用，不是設計資料）。</summary>
+        public PaintLayer paintLayer;
 
         /// <summary>名字（自由創作的娃娃、客人的娃娃、人台）。</summary>
         public string name = "";
@@ -250,6 +253,41 @@ namespace DollWorkshop
         {
             if (IsHuman) { var h = GetMain("head"); return ToDoll(h, 0, h.r * SM.ShapeR(h.sh, Mathf.PI / 2) * .97f); }
             var m = GetMain("body"); return ToDoll(m, 0, m.r * SM.ShapeR(m.sh, Mathf.PI / 2) * .9f);
+        }
+
+        // ---------- 硬材質：外形輪廓 ----------
+        /// <summary>娃娃所有看得到的外形（主體、左右部件、頭髮），硬材質的模具、鋸線、上色範圍都用它。（網頁版 dollPolys）</summary>
+        public List<List<Vector2>> SilhouettePolys()
+        {
+            var P = new List<List<Vector2>>();
+            foreach (var m in Mains()) P.Add(MainOutline(m, 160));
+            foreach (var k in ActiveParts()) foreach (int s in new[] { -1, 1 }) P.Add(PartPoly(k, s));
+            var hg = GetHair();
+            if (hg != null) { P.Add(hg.cap); if (hg.back != null) P.Add(hg.back); if (hg.tails != null) P.AddRange(hg.tails); }
+            return P;
+        }
+
+        static float Perim(List<Vector2> P) { float s = 0; for (int i = 0; i < P.Count; i++) s += Vector2.Distance(P[i], P[(i + 1) % P.Count]); return s; }
+
+        /// <summary>整隻娃娃的外輪廓點（每隔約 sp 像素一點，被其他部位蓋住的點不算）。（網頁版 silhouettePts）</summary>
+        public List<Vector2> SilhouettePts(float sp = 5)
+        {
+            var P = SilhouettePolys(); var o = new List<Vector2>();
+            for (int i = 0; i < P.Count; i++)
+                foreach (var q in CutGame.Resample(P[i], Mathf.Max(20, Mathf.RoundToInt(Perim(P[i]) / sp))))
+                {
+                    bool covered = false;
+                    for (int j = 0; j < P.Count && !covered; j++) if (j != i && SM.Pip(P[j], q)) covered = true;
+                    if (!covered) o.Add(q);
+                }
+            return o;
+        }
+
+        public MainPiece NearestMain(Vector2 p)
+        {
+            MainPiece best = null; float bd = 1e9f;
+            foreach (var m in Mains()) { float d = Vector2.Distance(p, new Vector2(m.cx, m.cy)) / m.r; if (d < bd) { bd = d; best = m; } }
+            return best;
         }
 
         // ---------- 裝飾 ----------

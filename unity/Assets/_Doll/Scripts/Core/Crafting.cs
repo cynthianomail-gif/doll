@@ -41,4 +41,22 @@ namespace DollWorkshop
 
     /// <summary>裝飾步驟加到娃娃上的配件或刺繡五官（位置是畫布像素，rot 是弧度）。</summary>
     public class DecorItem { public string type; public float x, y, s = 1, rot; public Vector2 Pos => new Vector2(x, y); }
+
+    /// <summary>上色的一筆（筆刷或噴漆）。colorId 用來算顏料費（每種顏色 $2）。</summary>
+    public class PaintStroke
+    {
+        public string colorId; public Color color; public float size; public bool spray;
+        public readonly List<Vector2> pts = new List<Vector2>();
+    }
+
+    /// <summary>硬材質娃娃表面的顏色：手繪、噴漆、亮光漆，以及烤太久的焦黃。</summary>
+    public class PaintData
+    {
+        public readonly List<PaintStroke> strokes = new List<PaintStroke>();
+        public bool varnish;
+        public float tint;
+        /// <summary>每改一次 +1，畫面用它判斷要不要重畫上色層。</summary>
+        public int version;
+        public void Touch() => version++;
+    }
 }

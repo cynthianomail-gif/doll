@@ -46,6 +46,14 @@ namespace DollWorkshop
                 if (fabs.Select(f => f.mat.id + f.color.id).Distinct().Count() >= 3) Add(new[] { "手作感", "活潑" });
             }
             foreach (var it in d.decor) { var dd = DB.DecorById(it.type); if (dd != null) Add(dd.tags); }
+            if (d.IsHard)
+            {
+                // 上色：每種顏料的標籤算半分，用了 4 種以上很活潑，上亮光漆很高級
+                var cs = d.paint.strokes.Select(s => s.colorId).Distinct().ToList();
+                foreach (var id in cs) { var c = PaintGame.Paints.FirstOrDefault(x => x.id == id); if (c != null) Add(c.tags, .5f); }
+                if (cs.Count >= 4) Add(new[] { "活潑" });
+                if (d.paint.varnish) Add(new[] { "高級" });
+            }
             return t;
         }
 
@@ -109,11 +117,26 @@ namespace DollWorkshop
             return r;
         }
 
+        /// <summary>硬材質的手工分數：各步驟小遊戲的平均，再扣缺洞、沒烤熟。（網頁版 hardCraft）</summary>
+        public static float HardCraft(Session ss, List<string> comments)
+        {
+            float craft = ss.hardAccs.Count > 0 ? ss.hardAccs.Values.Average() : .6f;
+            if (ss.doll.material == "vinyl")
+            {
+                if (ss.holes > 0) { craft -= ss.holes * .04f; comments.Add("有幾個小缺洞，膠好像沒灌滿。"); }
+                if (ss.sticky) { craft -= .15f; comments.Add("摸起來黏黏的，好像沒烤熟。"); }
+                if (ss.doll.paint.tint > 0) comments.Add("顏色有點焦黃。");
+                if (ss.trimNicks > 0) comments.Add("邊緣有幾道刀痕。");
+            }
+            else if (ss.carveGouges > 0) comments.Add("表面有鑿痕。");
+            return Mathf.Clamp01(craft);
+        }
+
         /// <summary>自由創作：不比對客人需求，只看手工；材料費自己付。</summary>
         public static Result EvaluateFree(Session ss)
         {
             var r = new Result { free = true };
-            r.craft = !ss.IsGarment && ss.doll.IsHard ? (ss.hardAccs.Count > 0 ? ss.hardAccs.Values.Average() : .8f) : CraftScore(ss, r.comments);
+            r.craft = !ss.IsGarment && ss.doll.IsHard ? HardCraft(ss, r.comments) : CraftScore(ss, r.comments);
             r.cost = ss.Cost(); r.profit = -r.cost; r.line = "完成了！";
             return r;
         }
@@ -161,7 +184,7 @@ namespace DollWorkshop
             if (lumpAvg > .3f) r.comments.Add("摸起來凹凸不平的。");
 
             float craft;
-            if (d.IsHard) craft = ss.hardAccs.Count > 0 ? ss.hardAccs.Values.Average() : .8f;
+            if (d.IsHard) craft = HardCraft(ss, r.comments);
             else craft = (ss.cutAcc + ss.SewAcc) / 2f * (1 - .35f * lumpAvg);
             if (ss.offGrain > 0) { craft -= Mathf.Min(.3f, ss.offGrain * .06f); r.comments.Add("有些布片的布紋方向不對，摸起來怪怪的。"); }
             if (d.stains.Count > 0) { craft -= d.stains.Count * .12f; r.comments.Add("這裡怎麼有一塊污漬？"); }

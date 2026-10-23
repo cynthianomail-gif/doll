@@ -205,14 +205,7 @@ namespace DollWorkshop.EditorTools
             StuffAll(hst, .7f, .75f); hu.Advance(); hu.Advance();
             Check(hu.result != null, $"人形交件 {hu.result?.stars}★：{string.Join("、", hu.result.review.Select(x => (x.ok ? "✔" : "✘") + x.text))}");
 
-            // 硬材質（M6 前仍是暫代面板）
-            var woodOrder = Orders.Doll.First(o => o.need.Any(n => n.needMat == "wood"));
-            var wood = new Session(meta, woodOrder); wood.Advance();
-            wood.doll.material = "wood"; wood.doll.fab["body"] = new Fab(DB.Mat("wood"), DB.Col("pine"));
-            while (wood.step != Step.Deliver) wood.Advance();
-            Check(wood.Steps().SequenceEqual(new[] { Step.Order, Step.Design, Step.Saw, Step.Carve, Step.Sand, Step.Paint, Step.Decor, Step.Deliver }), "木頭步驟正確");
-            Check(wood.result.review.Any(r => r.ok && r.text == woodOrder.need.First(n => n.needMat == "wood").label), $"{woodOrder.who}：木頭需求判定符合，{wood.result.stars}★");
-            Check(wood.doll.OverallSoft() >= 1, "木頭是硬的");
+            var woodOrder = RunHard(meta);
 
             // ---------- 裝飾 ----------
             var dec = new Session(meta, Orders.Doll[0]);
@@ -251,6 +244,108 @@ namespace DollWorkshop.EditorTools
             Check(true, "1–2★ 冒冷汗、3★ 普通、4–5★ 開心＋彩紙");
 
             RunGarments(meta);
+        }
+
+        // ---------- 硬材質：程式代玩 ----------
+        static Session NewHard(Meta meta, OrderDef order, string mat)
+        {
+            var ss = new Session(meta, order); ss.Advance();
+            ss.doll.material = mat; ss.doll.fab["body"] = new Fab(DB.Mat(mat), DB.Col(mat == "wood" ? "pine" : "pink"));
+            ss.doll.parts["ears"] = DB.Parts["ears"].Find("round"); ss.doll.ResetAdj("ears");
+            ss.doll.Rebuild(); ss.Advance();
+            return ss;
+        }
+
+        static void Cast(CastGame c, float pour, float bake, float drainSec)
+        {
+            c.ptr.down = true; for (int i = 0; i < Mathf.RoundToInt(pour / .03f); i++) c.Tick(.1f); c.ptr.down = false;
+            c.PourDone();
+            for (int i = 0; i < Mathf.RoundToInt(bake * 50); i++) c.Tick(.1f);
+            c.BakeStop();
+            c.ptr.down = true; for (int i = 0; i < Mathf.RoundToInt(drainSec * 10); i++) c.Tick(.1f); c.ptr.down = false;
+            c.DrainDone();
+        }
+
+        static void TrimAll(TrimGame t) { foreach (var f in t.flashes.ToList()) t.Process(f.p + f.n * f.len * .5f); }
+
+        static void SawAll(SawGame s) { s.ptr.speed = .1f; foreach (var p in s.pts) s.Process(p); }
+
+        static void CarveAll(CarveGame c) { for (int k = 0; k < c.R.Length && !c.done; k++) if (c.R[k]) c.Process(c.Grid.Center(k)); }
+
+        static void SandAll(SandGame s)
+        {
+            for (int pass = 0; pass < 2; pass++)
+            {
+                s.coarse = pass == 0;
+                for (int guard = 0; guard < 60 && !s.done; guard++)
+                    for (int k = 0; k < s.r.Length && !s.done; k += 3) if (s.r[k] > 0) s.Process(s.Grid.Center(k), 10);
+            }
+        }
+
+        static OrderDef RunHard(Meta meta)
+        {
+            // ---------- 搪膠 ----------
+            var ivy = Orders.Doll.First(o => o.need.Any(n => n.needMat == "vinyl"));
+            var v = NewHard(meta, ivy, "vinyl");
+            var cast = (CastGame)v.craft;
+            Check(v.step == Step.Cast && !cast.ShowDoll && !v.CanAdvance(out _), "搪膠從灌模開始，模具裡還看不到娃娃");
+            Cast(cast, 1f, .65f, 1.5f);
+            Check(cast.Done && v.hardAccs["pour"] > .9f && v.hardAccs["bake"] > .9f && v.holes == 0 && !v.sticky && v.doll.paint.tint == 0, "灌到虛線、烤剛好：沒缺洞、沒焦黃");
+            Check(Mathf.Abs(v.doll.OverallSoft() - (.4f + .65f * cast.thick)) < .01f && cast.thick < .6f, $"倒膠 1.5 秒：外殼變薄（{cast.thick:F2}），手感 {Evaluator.SoftLabel(v.doll.OverallSoft())}");
+            var bad = NewHard(meta, ivy, "vinyl"); var bc = (CastGame)bad.craft;
+            Cast(bc, .6f, .95f, 0);
+            Check(bad.holes > 0 && bad.doll.paint.tint > 0 && bc.thick == 1, $"灌太少有缺洞（{bad.holes}）、烤太久焦黃、沒倒膠很硬");
+            var raw = NewHard(meta, ivy, "vinyl"); Cast((CastGame)raw.craft, 1.2f, .3f, 0);
+            Check(raw.sticky && raw.waste > 0, $"烤太短黏黏的，灌太多浪費 ${raw.Cost() - raw.fabricCost}");
+            v.Advance();
+            var trim = (TrimGame)v.craft;
+            Check(trim.flashes.Count == 14, "修毛邊：14 處毛邊");
+            var m = v.doll.GetMain("body"); trim.Process(new Vector2(m.cx, m.cy));
+            Check(trim.nicks.Count == 1, "刀子切進娃娃中間留下刀痕");
+            TrimAll(trim);
+            Check(trim.Done && v.hardAccs["trim"] < 1, $"毛邊修完，品質 {v.hardAccs["trim"]:P0}");
+            v.Advance();
+            var paint = (PaintGame)v.craft;
+            var layer0 = PaintLayer.For(v.doll).PaintedPixels();
+            Check(layer0 > 0, $"搪膠有光澤（上色層 {layer0} 像素）");
+            paint.Down(new Vector2(20, 20)); paint.Move(new Vector2(60, 20), new Vector2(20, 20));
+            Check(PaintLayer.For(v.doll).PaintedPixels() == layer0, "畫在娃娃外面不會留下顏色");
+            paint.Undo();
+            paint.color = PaintGame.Paints.First(c => c.id == "black"); paint.Down(new Vector2(m.cx - 30, m.cy)); paint.Move(new Vector2(m.cx + 30, m.cy), new Vector2(m.cx - 30, m.cy));
+            paint.color = DB.Col("sky"); paint.spray = true; paint.Down(new Vector2(m.cx, m.cy + 30));
+            Check(PaintLayer.For(v.doll).PaintedPixels() > layer0 && v.PaintCost() == 4, $"在娃娃身上畫兩種顏色：顏料費 ${v.PaintCost()}");
+            v.Advance(); v.Advance();
+            Check(v.step == Step.Deliver && v.result != null, $"{ivy.who}：搪膠交件 {v.result.stars}★，手工 {v.result.craft:P0}，評語：{string.Join(" / ", v.result.comments)}");
+
+            // ---------- 木頭 ----------
+            var woodOrder = Orders.Doll.First(o => o.need.Any(n => n.needMat == "wood"));
+            var w = NewHard(meta, woodOrder, "wood");
+            Check(w.Steps().SequenceEqual(new[] { Step.Order, Step.Design, Step.Saw, Step.Carve, Step.Sand, Step.Paint, Step.Decor, Step.Deliver }), "木頭步驟正確");
+            var saw = (SawGame)w.craft;
+            saw.ptr.speed = 2; saw.Process(saw.pts[0]);
+            Check(saw.jams == 1 && !saw.cov[0], "鋸太快會卡住");
+            CraftGame.Clock = () => 1e6f; SawAll(saw); CraftGame.Clock = () => clock;
+            Check(saw.Done && w.hardAccs["saw"] > .9f, $"沿線鋸完，品質 {w.hardAccs["saw"]:P0}");
+            w.Advance();
+            var carve = (CarveGame)w.craft; var wm = w.doll.GetMain("body");
+            carve.Process(new Vector2(wm.cx, wm.cy));
+            Check(carve.gouges.Count == 1, "鑿進娃娃中間留下鑿痕");
+            CarveAll(carve);
+            Check(carve.Done && carve.removed >= carve.total * .96f, $"刮掉多餘的木頭（{carve.total} 格）");
+            w.Advance();
+            var sand = (SandGame)w.craft;
+            sand.coarse = true; for (int i = 0; i < 40; i++) for (int k = 0; k < sand.r.Length; k += 3) if (sand.r[k] > 0) sand.Process(sand.Grid.Center(k), 10);
+            Check(!sand.Done && sand.Rough > .3f, $"只用粗砂紙磨不光（粗糙度 {sand.Rough:F2}）");
+            SandAll(sand);
+            Check(sand.Done, $"換細砂紙磨光（品質 {w.hardAccs["sand"]:P0}）");
+            w.Advance();
+            var wp = (PaintGame)w.craft;
+            float before = Evaluator.Tally(w)["高級"];
+            w.doll.paint.varnish = true; w.doll.paint.Touch();
+            Check(Evaluator.Tally(w)["高級"] == before + 1 && w.PaintCost() == 5, "上亮光漆：多一分「高級」、$5");
+            w.Advance(); w.Advance();
+            Check(w.result.review.Any(r => r.ok && r.text == woodOrder.need.First(n => n.needMat == "wood").label) && w.doll.OverallSoft() >= 1, $"{woodOrder.who}：木頭交件 {w.result.stars}★，手工 {w.result.craft:P0}，評語：{string.Join(" / ", w.result.comments)}");
+            return woodOrder;
         }
 
         static Session GarmentRun(Meta meta, OrderDef o, string type, string cls, string mat, string color, params string[] trims)

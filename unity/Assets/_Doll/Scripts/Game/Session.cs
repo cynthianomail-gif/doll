@@ -103,7 +103,10 @@ namespace DollWorkshop
 
         // 硬材質（M6 移植前的暫代值）
         public readonly Dictionary<string, float> hardAccs = new Dictionary<string, float>();
-        public float vinylThickness = .5f;
+        // 搪膠：缺洞、沒烤熟、浪費的膠、修毛邊的刀痕；木頭：雕刻的鑿痕
+        public int holes, trimNicks, carveGouges;
+        public bool sticky;
+        public float waste;
 
         public Result result;
 
@@ -188,9 +191,13 @@ namespace DollWorkshop
                 case Step.Cast:
                 case Step.Saw:
                     fabricCost = (doll.material == "vinyl" ? 30 : 20) + doll.ActiveParts().Count() * 4 + (doll.IsHuman ? 8 : 0);
-                    doll.regs = doll.RegionsFor();
-                    SetHardFill(doll.material == "wood" ? 1f : .4f + .65f * vinylThickness);
+                    HardPrep();
+                    craft = doll.material == "vinyl" ? (CraftGame)new CastGame(this) : new SawGame(this);
                     break;
+                case Step.Trim: craft = new TrimGame(this); break;
+                case Step.Carve: craft = new CarveGame(this); break;
+                case Step.Sand: craft = new SandGame(this); break;
+                case Step.Paint: craft = new PaintGame(this); break;
                 case Step.Decor: case Step.GDecor: craft = new DecorGame(this); break;
                 case Step.GDesign: craft = new GarmentDesign(this); break;
                 case Step.Deliver: Deliver(); craft = new DeliverStage(this); break;
@@ -198,7 +205,18 @@ namespace DollWorkshop
         }
 
         public int DecorCost() => (IsGarment ? gItems : doll.decor).Sum(it => DB.DecorById(it.type)?.cost ?? 0);
-        public int Cost() => fabricCost + DecorCost();
+        /// <summary>顏料費：每種顏色 $2，亮光漆 $5。</summary>
+        public int PaintCost() => IsGarment || !doll.IsHard ? 0 : doll.paint.strokes.Select(s => s.colorId).Distinct().Count() * 2 + (doll.paint.varnish ? 5 : 0);
+        public int Cost() => fabricCost + DecorCost() + PaintCost() + Mathf.RoundToInt(waste);
+
+        /// <summary>硬材質開工：木頭是實心的；搪膠先當作中等厚度，倒膠後才決定。</summary>
+        void HardPrep()
+        {
+            hardAccs.Clear(); holes = trimNicks = carveGouges = 0; sticky = false; waste = 0;
+            doll.paint.tint = 0; doll.paint.Touch();
+            doll.regs = doll.RegionsFor();
+            SetHardFill(doll.material == "wood" ? 1f : .6f);
+        }
 
         /// <summary>硬材質的軟硬由外殼厚度決定（木頭是實心的）。</summary>
         public void SetHardFill(float f) { if (doll.regs == null) return; foreach (var r in doll.regs) r.fill = f; doll.Touch(); }

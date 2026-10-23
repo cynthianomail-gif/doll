@@ -26,6 +26,15 @@ namespace DollWorkshop
             Tri(i, j, k); Tri(i, k, l);
         }
 
+        /// <summary>四邊形，貼圖座標從左下 (0,0) 到右上 (1,1)。</summary>
+        public void QuadUV(Vector2 bl, Vector2 br, Vector2 tr, Vector2 tl, Color col)
+        {
+            int b0 = v.Count;
+            foreach (var (p, u) in new[] { (bl, new Vector2(0, 0)), (br, new Vector2(1, 0)), (tr, new Vector2(1, 1)), (tl, new Vector2(0, 1)) })
+            { v.Add(DollRenderer.W(p)); uv.Add(u); c.Add(FabricTextures.Lin(col)); }
+            Tri(b0, b0 + 1, b0 + 2); Tri(b0, b0 + 2, b0 + 3);
+        }
+
         public void Seg(Vector2 a, Vector2 b, float w, Color col)
         {
             var d = b - a; float L = d.magnitude; if (L < 1e-4f) return;
@@ -191,6 +200,15 @@ namespace DollWorkshop
         }
 
         public void Clear() { Begin(); End(); }
+
+        readonly Dictionary<Texture, Material> imageMats = new Dictionary<Texture, Material>();
+
+        /// <summary>把一張貼圖貼在畫布的某個矩形（貼圖的下緣對齊矩形的下緣）。</summary>
+        public void Image(Texture t, Rect r, Color? tint = null)
+        {
+            if (!imageMats.TryGetValue(t, out var m) || m == null) imageMats[t] = m = new Material(FabricTextures.SpriteShader) { mainTexture = t, name = "Image" };
+            With(m).QuadUV(new Vector2(r.xMin, r.yMax), new Vector2(r.xMax, r.yMax), new Vector2(r.xMax, r.yMin), new Vector2(r.xMin, r.yMin), tint ?? Color.white);
+        }
 
         /// <summary>畫一塊布片：布料紋理＋邊緣稍暗＋外框。</summary>
         public void Piece(IList<Vector2> P, MatDef mat, ColorDef col, float lineW = 2, float puff = .05f)

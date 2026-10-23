@@ -36,6 +36,12 @@ namespace DollWorkshop
             { Step.Cut, "按住滑鼠，沿著虛線剪。剪歪的地方會留下紅線，影響手工分數。" },
             { Step.Sew, "先在虛線上點幾下放珠針（橘色段落代表還沒固定）。開始車縫後：按住滑鼠沿虛線走，車速不要超過右邊的紅線；珠針靠近時按空白鍵拔掉；開頭和結尾按住 B 回針。覺得太難可以打開「車縫輔助」。" },
             { Step.Stuff, "在棉花袋上按住，拉出棉花（按越久越大團），拖到要塞的部位放開。耳朵、手腳只能塞小團，而且要在身體塞滿之前先塞。在娃娃上來回揉，可以把凹凸揉平。" },
+            { Step.Cast, "搪膠灌模：按住倒膠到虛線；烤的時候指針走到綠色區間就出爐；倒膠時按住越久，外殼越薄越軟。" },
+            { Step.Trim, "沿著邊緣削掉凸出來的毛邊，刀子不要切進娃娃。" },
+            { Step.Saw, "沿著鉛筆線慢慢鋸，太快鋸子會卡住。" },
+            { Step.Carve, "刮掉外圍多餘的木頭，不要鑿進娃娃本體。" },
+            { Step.Sand, "按住來回磨：先用粗砂紙磨平，再換細砂紙磨光。" },
+            { Step.Paint, "自由上色：選顏料和筆刷大小，按住拖曳就能畫。噴漆適合畫腮紅這類漸層。" },
             { Step.Decor, "點右邊的配件加到娃娃上，拖曳移動、滾輪縮放，Delete 刪除。眼睛、鼻子、嘴巴都是刺繡的五官。" },
             { Step.GDesign, "做衣服：選種類和尺寸。衣服要跟娃娃的身形一樣才穿得下（帽子看頭圍）——看清楚客人說的娃娃身形。" },
             { Step.GDecor, "在衣服上加蕾絲、鈕扣、口袋等裝飾。" },
@@ -296,12 +302,6 @@ namespace DollWorkshop
             else switch (ss.step)
             {
                 case Step.Order: OrderPanel(); break;
-                case Step.Cast: CastPanel(); break;
-                case Step.Trim: HardPanel("trim", "修毛邊", "沿著邊緣削掉毛邊，刀子不要切進娃娃。"); break;
-                case Step.Saw: HardPanel("saw", "鋸外形", "沿著鉛筆線慢慢鋸，太快鋸子會卡住。"); break;
-                case Step.Carve: HardPanel("carve", "雕刻", "刮掉外圍多餘的木頭，不要鑿進本體。"); break;
-                case Step.Sand: HardPanel("sand", "砂磨", "先粗砂紙磨平，再細砂紙磨光。"); break;
-                case Step.Paint: PaintPanel(); break;
             }
             GUILayout.Space(12);
             if (closet == null) OrderCard();
@@ -365,8 +365,6 @@ namespace DollWorkshop
             if (Btn($"🧺 衣櫃（娃娃 {meta.dolls.Count}・衣服 {meta.clothes.Count}）")) OpenCloset();
         }
 
-        void Placeholder(string what) => Small($"（「{what}」的小遊戲在 M6 移植，先用滑桿設定結果，讓流程可以走完。）");
-
         public float Slider(string label, float v, float min, float max, string valueText = null)
         {
             GUILayout.BeginHorizontal();
@@ -375,28 +373,6 @@ namespace DollWorkshop
             GUILayout.Label(valueText ?? $"{Mathf.RoundToInt(v * 100)}%", small, GUILayout.Width(70));
             GUILayout.EndHorizontal();
             return v;
-        }
-
-        void CastPanel()
-        {
-            H2("灌模"); Body("灌膠到虛線、看準時機出爐、倒出多餘的膠決定外殼厚度。"); Placeholder("灌模");
-            float t = Slider("外殼厚度", ss.vinylThickness, 0, 1, ss.vinylThickness > .66f ? "厚（硬）" : ss.vinylThickness > .33f ? "中等" : "薄（軟）");
-            if (!Mathf.Approximately(t, ss.vinylThickness)) { ss.vinylThickness = t; ss.SetHardFill(.4f + .65f * t); }
-            ss.hardAccs["cast"] = Slider("灌模品質", ss.hardAccs.TryGetValue("cast", out var a) ? a : .8f, 0, 1);
-            if (MainBtn("脫模，下一步 →")) Advance();
-        }
-
-        void HardPanel(string key, string name, string desc)
-        {
-            H2(name); Body(desc); Placeholder(name);
-            ss.hardAccs[key] = Slider("品質", ss.hardAccs.TryGetValue(key, out var a) ? a : .8f, 0, 1);
-            if (MainBtn("完成這一步 →")) Advance();
-        }
-
-        void PaintPanel()
-        {
-            H2("上色"); Body("在娃娃身上自由手繪、噴漆，木頭可以上亮光漆。"); Placeholder("上色");
-            if (MainBtn("先跳過上色 →")) Advance();
         }
     }
 }

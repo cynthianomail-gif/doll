@@ -87,7 +87,7 @@ namespace DollWorkshop
         public static string FitClassOf(Garment g, DollState d) => g.T.sizeBy == "head" ? d.HeadClass() : g.T.sizeBy == "body" ? d.BodyClass() : "通用";
 
         // ---------- 版型外形 ----------
-        static List<Vector2> ClipY(List<Vector2> P, float y, bool keepAbove)
+        public static List<Vector2> ClipY(List<Vector2> P, float y, bool keepAbove)
         {
             var o = new List<Vector2>();
             bool In(Vector2 p) => keepAbove ? p.y <= y : p.y >= y;
