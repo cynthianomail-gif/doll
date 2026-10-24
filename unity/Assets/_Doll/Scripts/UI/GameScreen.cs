@@ -68,7 +68,7 @@ namespace DollWorkshop
         void StartSession(Session s, Step start)
         {
             ss?.ClearPreview();
-            closet = null;
+            overlay = null; stream = false;
             ss = s;
             if (start != Step.Order) ss.Begin(start);
             dollRenderer.state = ss.ViewDoll;
@@ -79,15 +79,46 @@ namespace DollWorkshop
             scroll = Vector2.zero;
         }
 
-        // ---------- 衣櫃 ----------
-        ClosetScreen closet;
-        public void OpenCloset() { ss.ClearPreview(); closet = new ClosetScreen(ss); design.enabled = false; scroll = Vector2.zero; }
-        public void CloseCloset()
+        // ---------- 工作室以外的畫面：衣櫃、盲盒系列、開箱 ----------
+        CraftGame overlay;
+        void ShowOverlay(CraftGame o) { ss.ClearPreview(); overlay = o; design.enabled = false; scroll = Vector2.zero; ptr.down = false; }
+        public void OpenCloset() => ShowOverlay(new ClosetScreen(ss));
+        public void OpenSeries() { stream = false; ShowOverlay(new SeriesScreen(ss)); }
+        public void OpenUnbox(BlindSeries se)
         {
-            closet = null; scroll = Vector2.zero;
+            var u = new UnboxStage(ss, se); var why = u.Open();
+            if (why != null) { Flash(why); return; }
+            ShowOverlay(u);
+        }
+        public void CloseOverlay()
+        {
+            overlay = null; stream = false; scroll = Vector2.zero;
             if (ss.step == Step.Deliver) NewOrder(); else SyncDesign();
         }
-        CraftGame Active => closet ?? ss.craft;
+        public void CloseCloset() => CloseOverlay();
+        CraftGame Active => overlay ?? ss.craft;
+
+        // ---------- 直播模式：隱藏面板，畫面全螢幕；可以開綠幕 ----------
+        bool stream;
+        public void ToggleStream() { stream = !stream; scroll = Vector2.zero; }
+        float PanelW => stream ? 0 : DesignScreen.PanelWidth;
+
+        // ---------- 另外要畫的娃娃（系列一覽、開箱） ----------
+        readonly List<DollRenderer> gallery = new List<DollRenderer>();
+        DollRenderer GalleryRenderer(int i)
+        {
+            while (gallery.Count <= i) gallery.Add(new GameObject("GalleryDoll").AddComponent<DollRenderer>());
+            return gallery[i];
+        }
+        static readonly Color SilhouetteColor = new Color(.231f, .2f, .259f);
+
+        /// <summary>把 d 縮放 k 倍、外框中心放在畫布的 center。</summary>
+        static void Place(Transform tr, DollState d, Vector2 center, float k)
+        {
+            var b = d.Bounds();
+            tr.localScale = new Vector3(k, k, 1);
+            tr.position = DollRenderer.W(center) - k * DollRenderer.W(b.center);
+        }
 
         public void Advance()
         {
@@ -100,7 +131,7 @@ namespace DollWorkshop
 
         void SyncDesign()
         {
-            design.enabled = ss.step == Step.Design && closet == null;
+            design.enabled = ss.step == Step.Design && overlay == null;
             if (!design.enabled) dollRenderer.highlight = null;
         }
 
@@ -110,13 +141,23 @@ namespace DollWorkshop
         void Update()
         {
             cam.orthographicSize = Mathf.Max(2.8f, 4.0f / Mathf.Max(.1f, cam.aspect)); // 整張 800×560 的畫布都要看得到
-            if (!design.enabled) cam.rect = new Rect(0, 0, 1 - DesignScreen.PanelWidth / Screen.width, 1);
+            if (!design.enabled) cam.rect = new Rect(0, 0, 1 - PanelW / Screen.width, 1);
+            if (stream && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) stream = false;
             var craft = Active;
             ss.SyncPreview();
-            dollRenderer.state = closet != null ? closet.model : ss.ViewDoll;
+            dollRenderer.state = craft?.MainDoll ?? ss.ViewDoll;
             // 衣服訂單：接單時在旁邊小小地顯示客人的娃娃
-            bool customerDoll = closet == null && ss.step == Step.Order && ss.model != null;
-            dollRenderer.gameObject.SetActive(customerDoll || (closet != null || ss.step != Step.Order) && (craft == null || craft.ShowDoll));
+            bool customerDoll = overlay == null && ss.step == Step.Order && ss.model != null;
+            dollRenderer.gameObject.SetActive(customerDoll || (overlay != null || ss.step != Step.Order) && (craft == null || craft.ShowDoll));
+            int gi = 0;
+            if (craft != null)
+                foreach (var (d, center, k, sil) in craft.Gallery())
+                {
+                    var r = GalleryRenderer(gi++); if (!r.gameObject.activeSelf) r.gameObject.SetActive(true);
+                    r.state = d; r.silhouette = sil ? SilhouetteColor : (Color?)null; Place(r.transform, d, center, k);
+                }
+            for (; gi < gallery.Count; gi++) if (gallery[gi].gameObject.activeSelf) gallery[gi].gameObject.SetActive(false);
+            if (craft is UnboxStage us) us.streamMode = stream;
             if (customerDoll)
             {
                 const float k = .42f; float b = ss.model.Bounds().yMax;
@@ -146,7 +187,7 @@ namespace DollWorkshop
             var pointer = Pointer.current; if (pointer == null) return;
             var mouse = Mouse.current;
             Vector2 sp = pointer.position.ReadValue();
-            bool inGame = sp.x >= 0 && sp.x < Screen.width - DesignScreen.PanelWidth && sp.y >= 0 && sp.y < Screen.height;
+            bool inGame = sp.x >= 0 && sp.x < Screen.width - PanelW && sp.y >= 0 && sp.y < Screen.height;
             Vector2 p = DollRenderer.Px(cam.ScreenToWorldPoint(new Vector3(sp.x, sp.y, 10)));
             var prev = ptr.p; float d = Vector2.Distance(p, prev);
             // 速度（像素／毫秒）：和網頁版一樣平滑；停下來後逐漸歸零
@@ -286,14 +327,15 @@ namespace DollWorkshop
         void OnGUI()
         {
             Styles();
-            float pw = DesignScreen.PanelWidth, gx = Screen.width - pw;
-            if (closet == null) StepBar(gx);
+            float pw = PanelW, gx = Screen.width - pw;
+            if (overlay == null) StepBar(gx);
             var craft = Active;
-            if (closet == null && ss.step == Step.Order && ss.model != null) CanvasLabel(new Vector2(560, 448), "客人的娃娃", 13, new Color(.54f, .35f, .23f), TextAnchor.UpperCenter, true);
+            if (overlay == null && ss.step == Step.Order && ss.model != null) CanvasLabel(new Vector2(560, 448), "客人的娃娃", 13, new Color(.54f, .35f, .23f), TextAnchor.UpperCenter, true);
             if (craft != null) { craft.CanvasGUI(this); if (craft.Hint != null) Hint(craft.Hint); }
             if (Time.time < flashUntil) GUI.Label(new Rect(16, Screen.height - 64, gx - 32, 30), flash, body);
-            if (ss.step == Step.Order && closet == null) DrawCustomer(gx);
+            if (ss.step == Step.Order && overlay == null) DrawCustomer(gx);
             if (design.enabled) return; // 設計步驟的右側面板由 DesignScreen 負責
+            if (stream) { StreamBar(); return; }
 
             GUILayout.BeginArea(new Rect(gx, 0, pw, Screen.height), GUI.skin.box);
             scroll = GUILayout.BeginScrollView(scroll);
@@ -304,14 +346,27 @@ namespace DollWorkshop
                 case Step.Order: OrderPanel(); break;
             }
             GUILayout.Space(12);
-            if (closet == null) OrderCard();
+            if (overlay == null) OrderCard();
             GUILayout.EndScrollView();
+            GUILayout.EndArea();
+        }
+
+        /// <summary>直播模式右上角的小按鈕列。</summary>
+        void StreamBar()
+        {
+            GUILayout.BeginArea(new Rect(Screen.width - 430, 10, 420, 40));
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button($"綠幕：{(meta.chroma ? "開" : "關")}", btn)) meta.chroma = !meta.chroma;
+            if (GUILayout.Button($"減少閃爍：{(meta.reduceMotion ? "開" : "關")}", btn)) meta.reduceMotion = !meta.reduceMotion;
+            if (GUILayout.Button("離開直播模式（Esc）", btn)) stream = false;
+            GUILayout.EndHorizontal();
             GUILayout.EndArea();
         }
 
         void TipCard()
         {
-            if (closet != null || !Tips.TryGetValue(ss.step, out var t) || meta.tipsSeen.Contains(ss.step)) return;
+            if (overlay != null || !Tips.TryGetValue(ss.step, out var t) || meta.tipsSeen.Contains(ss.step)) return;
             GUILayout.Label($"💡 {(meta.tutDone ? "小提示" : "新手教學")}　{t}", tip);
             if (GUILayout.Button("知道了", btn, GUILayout.Width(90))) meta.tipsSeen.Add(ss.step);
             GUILayout.Space(6);
@@ -363,6 +418,7 @@ namespace DollWorkshop
             if (Btn("🧸 自由創作：做娃娃")) NewFree(false);
             if (Btn("👗 自由創作：做衣服")) NewFree(true);
             if (Btn($"🧺 衣櫃（娃娃 {meta.dolls.Count}・衣服 {meta.clothes.Count}）")) OpenCloset();
+            if (Btn($"🎁 盲盒系列（{meta.series.Count}）")) OpenSeries();
         }
 
         public float Slider(string label, float v, float min, float max, string valueText = null)

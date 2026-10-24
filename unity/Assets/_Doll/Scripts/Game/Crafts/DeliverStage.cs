@@ -125,6 +125,7 @@ namespace DollWorkshop
                 foreach (var c in r.comments) ui.Small("・" + c);
                 if (ui.MainBtn("回到工作室 →")) ui.NextCustomer();
                 if (ui.Btn("🧺 去衣櫃")) ui.OpenCloset();
+                if (!ss.IsGarment && ui.Btn("🎁 放進盲盒系列")) ui.OpenSeries();
                 return;
             }
             ui.H2("交件");

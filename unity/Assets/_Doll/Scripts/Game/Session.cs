@@ -13,6 +13,12 @@ namespace DollWorkshop
         public bool tutDone;
         /// <summary>看過（按了「知道了」）的步驟提示。</summary>
         public readonly HashSet<Step> tipsSeen = new HashSet<Step>();
+        /// <summary>盲盒系列、目前選的系列、直播用的綠幕、減少閃爍與晃動。</summary>
+        public readonly List<BlindSeries> series = new List<BlindSeries>();
+        public int seriesSel;
+        public bool chroma, reduceMotion;
+        public BlindSeries CurSeries => seriesSel >= 0 && seriesSel < series.Count ? series[seriesSel] : null;
+
         /// <summary>自由創作做好的娃娃（展示櫃）與衣服（衣櫃）。</summary>
         public readonly List<DollState> dolls = new List<DollState>();
         public readonly List<Garment> clothes = new List<Garment>();

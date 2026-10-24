@@ -31,6 +31,7 @@ namespace DollWorkshop
         }
 
         public override string Hint => "衣櫃：同身形的衣服可以互穿";
+        public override DollState MainDoll => model;
         public override bool Done => true;
 
         public override void CanvasGUI(GameScreen ui)

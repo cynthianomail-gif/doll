@@ -244,6 +244,68 @@ namespace DollWorkshop.EditorTools
             Check(true, "1–2★ 冒冷汗、3★ 普通、4–5★ 開心＋彩紙");
 
             RunGarments(meta);
+            RunBlindBox(meta);
+        }
+
+        static void RunBlindBox(Meta meta)
+        {
+            var a = Garments.BuildDoll(new DollSpec { name = "小A", hair = "bob", decor = new[] { "eyes_dot" } });
+            var b = Garments.BuildDoll(new DollSpec { name = "小B", hair = "twin", hairColor = "milktea" });
+            var c = Garments.BuildDoll(new DollSpec { name = "小C", hair = "hime", torsoW = 1.4f });
+            meta.dolls.AddRange(new[] { a, b, c });
+            var ss = new Session(meta, Orders.Free(false));
+            var sc = new SeriesScreen(ss); var se = sc.NewSeries();
+            Check(meta.CurSeries == se && se.name.StartsWith("我的系列"), $"新系列：{se.name}");
+            se.Toggle(a);
+            Check(!se.CanOpen && new UnboxStage(ss, se).Open() != null, "只有 1 款不能開盒");
+            se.Toggle(b); se.Toggle(c);
+            se.SetRarity(se.dolls[1], "rare"); se.SetRarity(se.dolls[2], "secret");
+            float tot = 1 + .35f + .08f;
+            Check(Mathf.Abs(se.Odds(se.dolls[2]) - .08f / tot) < 1e-4f && Mathf.Abs(se.dolls.Sum(se.Odds) - 1) < 1e-4f, $"機率：普通 {se.Odds(se.dolls[0]):P0}、稀有 {se.Odds(se.dolls[1]):P0}、隱藏款 {se.Odds(se.dolls[2]):P1}");
+            se.SetRarity(se.dolls[0], "secret");
+            Check(se.dolls[0].rarity == "secret" && se.dolls[2].rarity == "rare", "隱藏款只能一款，原本的變成稀有");
+            se.SetRarity(se.dolls[0], "common"); se.SetRarity(se.dolls[2], "secret");
+            Check(se.Pick(.01f).doll == a && se.Pick(.999f).doll == c, "依機率抽到對應的娃娃");
+            var rng = new System.Random(7); int secret = 0; for (int i = 0; i < 20000; i++) if (se.Pick((float)rng.NextDouble()).rarity == "secret") secret++;
+            Check(Mathf.Abs(secret / 20000f - .08f / tot) < .01f, $"抽兩萬次，隱藏款出現 {secret / 200f:F1}%（應該約 {8f / tot:F1}%）");
+            var big = new BlindSeries { name = "大系列" };
+            for (int i = 0; i < 7; i++) big.Toggle(Garments.BuildDoll(new DollSpec { name = "x" + i }));
+            Check(big.Toggle(a) != null && big.dolls.Count == BlindSeries.Max, "一個系列最多 7 款");
+
+            meta.coins = 50;
+            var u = new UnboxStage(ss, se);
+            Check(u.Open(.75f) == null && meta.coins == 40 && se.opened == 1 && u.doll == b && u.rar == "rare", $"開一盒：花 $10，抽到 {u.doll.name}");
+            u.Tick(1);
+            Check(u.phase == "lid", "盒子晃完，輪到撕盒蓋");
+            u.ptr.down = true; u.Move(new Vector2(400, 100), new Vector2(400, 300));
+            Check(u.phase == "lidfly", "往上拖撕開盒蓋");
+            u.Tick(.6f); u.Tick(.7f);
+            Check(u.phase == "bag" && !u.Gallery().Any(), "鋁箔袋升起來，還看不到娃娃");
+            u.Move(new Vector2(560, 300), new Vector2(260, 300));
+            Check(u.phase == "suspense", "左右拖撕開袋子");
+            u.Tick(1.2f); u.Tick(1.9f);
+            Check(u.phase == "card" && se.owned[b] == 1 && se.Collected == 1 && u.Gallery().Count() == 1, "稀有款懸疑比較久，揭曉後收集卡記下進度 1/3");
+            u.streamMode = true; u.Down(new Vector2(400, 300));
+            Check(u.phase == "shake" && meta.coins == 30 && se.opened == 2, "直播模式點畫面再開一盒");
+            meta.coins = 5;
+            Check(new UnboxStage(ss, se).Open() == "錢不夠開盒了", "錢不夠不能開");
+            Check(sc.Gallery().Count() == 3 && sc.Gallery().Count(g => g.silhouette) == 1, "系列一覽：3 款，隱藏款畫成剪影");
+
+            // 繪圖：盒子五種圖案、鋁箔袋、剪影娃娃
+            var go = new GameObject("test sketch"); var sk = go.AddComponent<Sketch>();
+            var gr = new GameObject("test silhouette").AddComponent<DollRenderer>();
+            try
+            {
+                sk.Begin();
+                foreach (var (id, _) in BoxStyle.Patterns) { var bs = new BoxStyle { pattern = id, color = "sky", pcolor = "white" }; BoxArt.Draw(sk, 100, 200, 180, 200, 60, bs, .5f, true, 3); }
+                BoxArt.Bag(sk, 300, 150, 150, 190, .4f, 0, 0, 284);
+                sk.End();
+                Check(go.transform.childCount > 0, $"5 種圖案的盒子和鋁箔袋畫得出來（{go.transform.childCount} 批）");
+                gr.state = c; gr.silhouette = new Color(.231f, .2f, .259f); gr.Build();
+                var mf = gr.GetComponentInChildren<MeshFilter>(); var cols = mf.sharedMesh.colors; var want = FabricTextures.Lin(new Color(.231f, .2f, .259f));
+                Check(cols.Length > 0 && cols.All(x => Mathf.Abs(x.r - want.r) < .01f && Mathf.Abs(x.b - want.b) < .01f), "剪影：整隻娃娃同一個顏色");
+            }
+            finally { Object.DestroyImmediate(go); Object.DestroyImmediate(gr.gameObject); }
         }
 
         // ---------- 硬材質：程式代玩 ----------

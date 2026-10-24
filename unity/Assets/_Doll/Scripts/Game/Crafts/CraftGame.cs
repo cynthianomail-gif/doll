@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace DollWorkshop
@@ -42,6 +43,12 @@ namespace DollWorkshop
         public virtual Vector2 DollOffset => Vector2.zero;
         /// <summary>隱藏系統游標，改畫剪刀、縫紉機等工具。</summary>
         public virtual bool HideCursor => false;
+
+        /// <summary>畫面主要顯示的娃娃（null = 這張訂單的娃娃）。衣櫃顯示選中的娃娃。</summary>
+        public virtual DollState MainDoll => null;
+
+        /// <summary>另外要畫的娃娃：中心位置（畫布）、縮放、是否畫成剪影。盲盒的系列一覽、開箱時用。</summary>
+        public virtual IEnumerable<(DollState doll, Vector2 center, float scale, bool silhouette)> Gallery() { yield break; }
 
         public virtual void Down(Vector2 p) { }
         /// <summary>按住拖曳時，沿路每隔約 3 像素呼叫一次（和網頁版一樣，快速移動也不會漏掉）。</summary>

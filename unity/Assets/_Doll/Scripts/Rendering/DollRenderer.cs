@@ -12,6 +12,9 @@ namespace DollWorkshop
     {
         public DollState state = new DollState();
         [Tooltip("目前選取的分頁，該部位會畫成虛線外框")] public string highlight;
+        /// <summary>有值時整隻娃娃畫成這個顏色的剪影（盲盒的隱藏款）。</summary>
+        public Color? silhouette;
+        Color? builtSilhouette;
 
         int builtVersion = -1;
         DollState builtState;
@@ -29,14 +32,23 @@ namespace DollWorkshop
 
         void LateUpdate()
         {
-            if (state.version != builtVersion || highlight != builtHighlight || state != builtState) Build();
+            if (state.version != builtVersion || highlight != builtHighlight || state != builtState || silhouette != builtSilhouette) Build();
         }
 
         public void Build()
         {
-            builtVersion = state.version; builtHighlight = highlight; builtState = state;
+            builtVersion = state.version; builtHighlight = highlight; builtState = state; builtSilhouette = silhouette;
             used = 0;
             if (state.DesignReady) DrawDoll();
+            if (silhouette != null)
+                for (int i = 0; i < used; i++)
+                {
+                    var pc = pool[i]; var sc = FabricTextures.Lin(silhouette.Value);
+                    var old = pc.mesh.colors; var cols = new Color[pc.mesh.vertexCount];
+                    for (int k = 0; k < cols.Length; k++) cols[k] = new Color(sc.r, sc.g, sc.b, old.Length > k ? Mathf.Min(1, old[k].a * 4) : 1);
+                    pc.mesh.colors = cols; pc.mr.sharedMaterial = FabricTextures.Plain;
+                    pc.line.startColor = pc.line.endColor = sc;
+                }
             for (int i = used; i < pool.Count; i++) pool[i].go.SetActive(false);
         }
 
@@ -75,7 +87,7 @@ namespace DollWorkshop
             if (hg != null) DrawPoly(hg.cap, hf, 40, false, .35f, highlight == "hair");
             if (clothed && !s.IsHard) { DrawGarment(s.Worn("band"), 41); DrawGarment(s.Worn("hat"), 42); DrawGarment(s.Worn("clip"), 43); }
             foreach (var k in s.ActiveParts("front")) DrawPartPair(k, 50, fx);
-            if (s.IsHard) DrawPaint(50);
+            if (s.IsHard && silhouette == null) DrawPaint(50);
             if (clothed && s.IsHard) { DrawGarment(s.Worn("bottom"), 51); DrawGarment(s.Worn("top"), 52); DrawGarment(s.Worn("band"), 53); DrawGarment(s.Worn("hat"), 54); DrawGarment(s.Worn("clip"), 55); }
             if (clothed) DrawGarment(s.Worn("bag"), 57);
             foreach (var it in s.decor) DecorArt.Draw(mb, it);
